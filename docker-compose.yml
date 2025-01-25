@@ -1,0 +1,19 @@
+version: '3.8'
+services:
+  web:
+    build: .
+    ports:
+      - "3000:80"  # Expose container's port 80 to host's port 3000
+    depends_on:
+      - mongodb  # Ensure MongoDB starts first
+
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    ports:
+      - "27017:27017"  # MongoDB default port
+    volumes:
+      - mongodb-data:/data/db  # Persistent data storage
+
+volumes:
+  mongodb-data:  # Named volume for MongoDB data persistence
