@@ -14,45 +14,40 @@ const SignInLayer = () => {
 
   // Handle form submission
   const handleSubmit = async (e) => {
-    e.preventDefault(); // Prevent default form submission behavior
-
+    e.preventDefault();
+  
     try {
-      // Make a POST request to the Flask backend
       const response = await axios.post("http://localhost:5000/api/login", {
-        email, // Send email instead of username
-        password,
+        email,
+        password
       });
-
-      // Show success message using SweetAlert2
-      Swal.fire({
+  
+      await Swal.fire({
         icon: "success",
         title: "Login Successful",
         text: response.data.message,
         confirmButtonText: "OK",
+        allowOutsideClick: false
       });
-
-      // Save session data and redirect to a protected page
-      localStorage.setItem("user", JSON.stringify(response.data.user)); // Save user data in localStorage
-      navigate("/dashboard"); // Redirect to a dashboard page
+  
+      // Add a small delay before checking session
+      setTimeout(async () => {
+        const sessionCheck = await axios.get("http://localhost:5000/api/session-check");
+        if (sessionCheck.data.authenticated) {
+          navigate("/dashboard", { replace: true });
+        }
+      }, 100);
+  
     } catch (error) {
-      // Handle login errors
-      if (error.response && error.response.data.error) {
-        Swal.fire({
-          icon: "error",
-          title: "Login Failed",
-          text: error.response.data.error,
-          confirmButtonText: "Try Again",
-        });
-      } else {
-        Swal.fire({
-          icon: "error",
-          title: "Error",
-          text: "An error occurred. Please try again.",
-          confirmButtonText: "OK",
-        });
-      }
+      Swal.fire({
+        icon: "error",
+        title: "Login Failed",
+        text: error.response?.data?.error || "An error occurred",
+        confirmButtonText: "Try Again"
+      });
     }
   };
+
 
   return (
     <section className="auth bg-base d-flex flex-wrap">

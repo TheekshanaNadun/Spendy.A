@@ -10,6 +10,36 @@
     <link rel="stylesheet" type="text/css" href="css/responsiveslides.css">
     <link rel="stylesheet" type="text/css" href="css/responsive.css">
     <link href='http://fonts.googleapis.com/css?family=Lato:100,300,400,700,900' rel='stylesheet' type='text/css'>
+    <style type="text/css">
+       .nav-item {
+    display: inline-block;
+    position: relative;
+}
+
+.nav-item a {
+    display: block;
+    padding: 15px;
+    text-decoration: none;
+}
+
+/* Preserve existing styles */
+.header ul {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.logo {
+    /* Keep your existing logo styles */
+}
+/* Hide/show elements without breaking layout */
+.nav-item[style*="display: none"] {
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+}
+        </style>
+
 </head>
 <body class="no-blog">
     <div class="body_background"></div>
@@ -18,8 +48,12 @@
             <div class="main">
                 <nav class="header">
                     <ul>
-                        <li><a href="/sign-up">Sign Up</a></li>
-                        <li><a href="about.html">About Us</a></li>
+                        <li class="nav-item auth-item">
+                            <a href="/sign-up">Sign Up</a>
+                        </li>
+                        <li class="nav-item logged-item" style="display: none;">
+                            <a href="/dashboard">Dashboard</a>
+                        </li>                                      
                         <li class="logo">
                             <a href="index.html">
                                 <img src="images/logo_.png" alt="">
@@ -27,16 +61,24 @@
                                 <h6>Smart Expense Tracking</h6>
                             </a>
                         </li>
-                        <li><a href="/dashboard">Dashboard</a></li>
-                        <li><a href="/sign-in">Log In</a></li>
+                       
+                        <li class="nav-item auth-item">
+                            <a href="/sign-in">Log In</a>
+                        </li>
+                        <li class="nav-item logged-item" style="display: none;">
+                            <a href="#" class="logout-btn">Logout</a>
+                        </li>
                     </ul>
-
-                    
                 </nav>
+                
                 <nav class="header scroll_menu">
                     <ul>
-                        <li><a href="/sign-up">Sign Up</a></li>
-                        <li><a href="about.html">About Us</a></li>
+                        <li class="nav-item auth-item">
+                            <a href="/sign-up">Sign Up</a>
+                        </li>
+                        <li class="nav-item logged-item" style="display: none;">
+                            <a href="/dashboard">Dashboard</a>
+                        </li>                                      
                         <li class="logo">
                             <a href="index.html">
                                 <img src="images/logo_.png" alt="">
@@ -44,11 +86,16 @@
                                 <h6>Smart Expense Tracking</h6>
                             </a>
                         </li>
-                        <li><a href="/dashboard">Dashboard</a></li>
-                        <li><a href="/sign-in">Log In</a></li>
-
+                       
+                        <li class="nav-item auth-item">
+                            <a href="/sign-in">Log In</a>
+                        </li>
+                        <li class="nav-item logged-item" style="display: none;">
+                            <a href="#" class="logout-btn">Logout</a>
+                        </li>
                     </ul>
                 </nav>
+                
                 <div id="scene_1">
                     <img class="item" src="images/scene/a1.png" alt="">
                     <div id="items">
@@ -180,6 +227,7 @@
     </div>
 
     <script type="text/javascript" src="js/jquery.min.js"></script>
+    <script src="script.js"></script>
     <script type="text/javascript" src="js/Chart.min.js"></script>
     <script type="text/javascript" src="js/jquery.flexslider.min.js"></script>
     <script type="text/javascript" src="js/jquery.prettyPhoto.js"></script>
@@ -187,7 +235,6 @@
     <script type="text/javascript" src="js/responsiveslides.js"></script>
     <script type="text/javascript" src="js/jquery.cookie.js"></script>
     <script type="text/javascript" src="js/_front.js"></script>
-    <script src="script.js"></script>
 
 </body>
 </html>

@@ -2,6 +2,8 @@
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <meta http-equiv="Content-Security-Policy" content="default-src *; connect-src 'self' http://localhost:5000;">
     <title>Spendy.AI - Smart Expense Tracking</title>
 
       <!-- Add your bundled app -->
@@ -33,71 +35,40 @@
                                 <h6>Smart Expense Tracking</h6>
                             </a>
                         </li>
-                        <li><a href="/dashboard">Dashboard</a></li>
-                        <li><a class="trigger-btn">Login</a></li>
-                    </ul>
-
-                    <div class="modal" id="authModal">
-                        <div class="modal-content">
-                            <span class="close">&times;</span>
-                            <div class="tabs">
-                                <button class="tab-btn active"class="trigger-btn" data-tab="login">Login</button>
-                                <button class="tab-btn" data-tab="signup">Sign Up</button>
-                            </div>
-                            
-                            <div class="tab-content" id="login">
-                                <form>
-                                    <input type="email" placeholder="Email" required>
-                                    <input type="password" placeholder="Password" required>
-                                    <button type="submit">Login</button>
-                                </form>
-                            </div>
-                            
-                            <div class="tab-content" id="signup" style="display:none">
-                                <form>
-                                    <input type="text" placeholder="Full Name" required>
-                                    <input type="email" placeholder="Email" required>
-                                    <input type="password" placeholder="Password" required>
-                                    <input type="password" placeholder="Confirm Password" required>
-                                    <button type="submit">Sign Up</button>
-                                </form>
-                            </div>
-                            <div class="tab-content" id="verification" style="display:none">
-                                <form class="verification-form">
-                                    <div class="verification-message">
-                                        Enter the 6-digit code sent to your email/phone
-                                    </div>
-                                    <div class="otp-container">
-                                        <input type="text" maxlength="1" class="otp-input" autofocus>
-                                        <input type="text" maxlength="1" class="otp-input">
-                                        <input type="text" maxlength="1" class="otp-input">
-                                        <input type="text" maxlength="1" class="otp-input">
-                                        <input type="text" maxlength="1" class="otp-input">
-                                        <input type="text" maxlength="1" class="otp-input">
-                                    </div>
-                                    <div class="timer">Time remaining: <span id="countdown">02:00</span></div>
-                                    <button type="submit">Verify</button>
-                                    <button type="button" class="resend-btn">Resend Code</button>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                </nav>
-                <nav class="header scroll_menu">
-                    <ul>
-                        <li><a href="shortcodes.html">Features</a></li>
-                        <li><a href="about.html">About Us</a></li>
-                        <li class="logo">
-                            <a href="index.html">
-                                <img src="images/logo_.png" alt="">
-                                <h3>Spendy.AI</h3>
-                                <h6>Smart Expense Tracking</h6>
-                            </a>
+                        <li id="dashboard-link-main" style="display: none;">
+                            <a href="/dashboard">Dashboard</a>
                         </li>
-                        <li><a href="/dashboard">Dashboard</a></li>
-                        <li><a  class="trigger-btn">Login</a></li>
+                        <li id="auth-buttons-main">
+                            <a class="trigger-btn">Login</a>
+                        </li>
+                        <li id="logout-button-main" style="display: none;">
+                            <a href="#" class="logout-btn">Logout</a>
+                        </li>
                     </ul>
                 </nav>
+                <!-- Scroll Menu Navigation -->
+<nav class="header scroll_menu">
+    <ul>
+        <li><a href="shortcodes.html">Features</a></li>
+        <li><a href="about.html">About Us</a></li>
+        <li class="logo">
+            <a href="index.html">
+                <img src="images/logo_.png" alt="">
+                <h3>Spendy.AI</h3>
+                <h6>Smart Expense Tracking</h6>
+            </a>
+        </li>
+        <li id="dashboard-link-scroll" style="display: none;">
+            <a href="/dashboard">Dashboard</a>
+        </li>
+        <li id="auth-buttons-scroll">
+            <a class="trigger-btn">Login</a>
+        </li>
+        <li id="logout-button-scroll" style="display: none;">
+            <a href="#" class="logout-btn">Logout</a>
+        </li>
+    </ul>
+</nav>
                 <div id="scene_1">
                     <img class="item" src="images/scene/a1.png" alt="">
                     <div id="items">
@@ -227,7 +198,7 @@
             </div>
         </footer>
     </div>
- 
+    <script src="script.js"></script>
     <script type="text/javascript" src="js/Chart.min.js"></script>
     <script type="text/javascript" src="js/jquery.flexslider.min.js"></script>
     <script type="text/javascript" src="js/jquery.prettyPhoto.js"></script>
@@ -235,7 +206,6 @@
     <script type="text/javascript" src="js/responsiveslides.js"></script>
     <script type="text/javascript" src="js/jquery.cookie.js"></script>
     <script type="text/javascript" src="js/_front.js"></script>
-    <script src="script.js"></script>
 
 </body>
 </html>

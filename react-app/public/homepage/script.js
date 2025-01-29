@@ -4,7 +4,63 @@ document.addEventListener('DOMContentLoaded', () => {
     const triggerBtns = document.querySelectorAll('.trigger-btn');
     const closeBtns = document.querySelectorAll('.close');
     const tabBtns = document.querySelectorAll('.tab-btn');
-    const otpInputs = document.querySelectorAll('.otp-input');
+      // Check authentication status immediately and periodically
+    checkAuthStatus();
+    setInterval(checkAuthStatus, 5000);
+
+    async function checkAuthStatus() {
+        try {
+            const response = await fetch('http://localhost:5000/api/session-check', {
+                credentials: 'include'
+            });
+            const data = await response.json();
+            console.log('Auth status:', data);
+            updateUIBasedOnAuth(data.authenticated);
+        } catch (error) {
+            console.error('Session check failed:', error);
+            updateUIBasedOnAuth(false);
+        }
+    }
+
+    function updateUIBasedOnAuth(isAuthenticated) {
+        try {
+            // Get all auth items (Sign Up, Login) and logged items (Dashboard, Logout)
+            const authItems = document.querySelectorAll('.auth-item');
+            const loggedItems = document.querySelectorAll('.logged-item');
+    
+            // Update visibility based on authentication status
+            authItems.forEach(item => {
+                item.style.display = isAuthenticated ? 'none' : 'block';
+            });
+    
+            loggedItems.forEach(item => {
+                item.style.display = isAuthenticated ? 'block' : 'none';
+            });
+    
+            console.log('UI updated:', isAuthenticated);
+        } catch (error) {
+            console.error('Error updating UI:', error);
+        }
+    }
+
+    // Handle logout
+    document.querySelectorAll('.logout-btn').forEach(button => {
+        button.addEventListener('click', async (e) => {
+            e.preventDefault();
+            try {
+                const response = await fetch('http://localhost:5000/api/logout', {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+                if (response.ok) {
+                    await checkAuthStatus();
+                    window.location.href = '/';
+                }
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+        });
+    });
 
     // Modal handling
     triggerBtns.forEach(btn => {
@@ -49,45 +105,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // OTP input handling
-    otpInputs.forEach((input, index) => {
-        input.addEventListener('keyup', (e) => {
-            if (e.key >= 0 && e.key <= 9) {
-                if (index < otpInputs.length - 1) {
-                    otpInputs[index + 1].focus();
-                }
-            } else if (e.key === 'Backspace') {
-                if (index > 0) {
-                    otpInputs[index - 1].focus();
-                }
-            }
-        });
-    });
 
-    // Timer functionality
-    function startTimer(duration, display) {
-        let timer = duration;
-        let minutes, seconds;
-        
-        let countdown = setInterval(() => {
-            minutes = parseInt(timer / 60, 10);
-            seconds = parseInt(timer % 60, 10);
-            
-            minutes = minutes < 10 ? "0" + minutes : minutes;
-            seconds = seconds < 10 ? "0" + seconds : seconds;
-            
-            display.textContent = minutes + ":" + seconds;
-            
-            if (--timer < 0) {
-                clearInterval(countdown);
-                document.querySelector('.resend-btn').disabled = false;
-            }
-        }, 1000);
-    }
 
-    // Start timer when verification page loads
-    const timerDisplay = document.querySelector('#countdown');
-    if (timerDisplay) startTimer(120, timerDisplay);
+
+    
 });
 
 // Scroll menu handling
