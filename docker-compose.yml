@@ -1,19 +1,20 @@
 version: '3.8'
+
 services:
-  web:
-    build: .
+  redis:
+    image: redis:latest
+    container_name: redis
     ports:
-      - "3000:80"  # Expose container's port 80 to host's port 3000
-    depends_on:
-      - mongodb  # Ensure MongoDB starts first
+      - "6379:6379"
 
-  mongodb:
-    image: mongo:latest
-    container_name: mongodb
+  flask:
+    build:
+      context: ./react-app  # Adjust path if necessary
+      dockerfile: Dockerfile
+    container_name: flask-app
     ports:
-      - "27017:27017"  # MongoDB default port
+      - "5000:5000"
     volumes:
-      - mongodb-data:/data/db  # Persistent data storage
-
-volumes:
-  mongodb-data:  # Named volume for MongoDB data persistence
+      - ./react-app:/app  # Mount your Flask app directory
+    depends_on:
+      - redis

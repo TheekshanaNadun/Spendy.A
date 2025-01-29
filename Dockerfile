@@ -1,17 +1,11 @@
-# Use the Nginx base image
-FROM nginx:latest
+FROM python:3.9-slim
 
-# Copy the static landing page
-COPY homepage /usr/share/nginx/homepage
+WORKDIR /app
 
-# Copy the React app build files
-COPY react-app/build /usr/share/nginx/react-app
+COPY requirements.txt /app/requirements.txt
 
-# Copy the Nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Expose port 80 for Nginx
-EXPOSE 80
+COPY . /app
 
-# Start Nginx
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["python", "app.py"]
