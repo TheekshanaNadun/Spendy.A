@@ -2,39 +2,62 @@ import { Icon } from "@iconify/react/dist/iconify.js";
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
-axios.defaults.withCredentials = true;
+import Swal from "sweetalert2";
 
+axios.defaults.withCredentials = true;
 
 const SignUpLayer = () => {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
   // Handle form submission
   const handleSubmit = async (e) => {
-    e.preventDefault(); // Prevent default form submission behavior
+    e.preventDefault();
+
+    // Validate password length
+    if (password.length < 8) {
+      Swal.fire({
+        icon: "error",
+        title: "Invalid Password",
+        text: "Password must be at least 8 characters long",
+        confirmButtonText: "OK",
+      });
+      return;
+    }
 
     try {
-      // Make a POST request to the Flask backend
       const response = await axios.post("http://localhost:5000/api/signup", {
         username,
         email,
         password,
       });
 
-      // If signup is successful, show success message and redirect to login
-      alert(response.data.message); // Show success message
+      // Show success message using SweetAlert2
+      await Swal.fire({
+        icon: "success",
+        title: "Registration Successful",
+        text: response.data.message,
+        confirmButtonText: "Continue to Login",
+      });
+
       navigate("/sign-in"); // Redirect to sign-in page
     } catch (error) {
-      // Handle signup errors
-      if (error.response && error.response.data.error) {
-        setErrorMessage(error.response.data.error); // Display error message from the backend
-      } else {
-        setErrorMessage("An error occurred. Please try again.");
-      }
+      // Handle signup errors with SweetAlert2
+      Swal.fire({
+        icon: "error",
+        title: "Registration Failed",
+        text: error.response?.data?.error || "An error occurred. Please try again.",
+        confirmButtonText: "Try Again",
+      });
     }
+  };
+
+  // Toggle password visibility
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
   };
 
   return (
@@ -55,11 +78,8 @@ const SignUpLayer = () => {
               Welcome! Please enter your details.
             </p>
           </div>
-          {/* Display error message */}
-          {errorMessage && (
-            <div className="alert alert-danger mb-16">{errorMessage}</div>
-          )}
           <form onSubmit={handleSubmit}>
+            {/* Username Input */}
             <div className="icon-field mb-16">
               <span className="icon top-50 translate-middle-y">
                 <Icon icon="f7:person" />
@@ -69,10 +89,12 @@ const SignUpLayer = () => {
                 className="form-control h-56-px bg-neutral-50 radius-12"
                 placeholder="Username"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)} // Update username state
+                onChange={(e) => setUsername(e.target.value)}
                 required
               />
             </div>
+
+            {/* Email Input */}
             <div className="icon-field mb-16">
               <span className="icon top-50 translate-middle-y">
                 <Icon icon="mage:email" />
@@ -82,71 +104,73 @@ const SignUpLayer = () => {
                 className="form-control h-56-px bg-neutral-50 radius-12"
                 placeholder="Email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)} // Update email state
+                onChange={(e) => setEmail(e.target.value)}
                 required
               />
             </div>
+
+            {/* Password Input */}
             <div className="mb-20">
-              <div className="position-relative ">
+              <div className="position-relative">
                 <div className="icon-field">
                   <span className="icon top-50 translate-middle-y">
                     <Icon icon="solar:lock-password-outline" />
                   </span>
                   <input
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     className="form-control h-56-px bg-neutral-50 radius-12"
                     id="your-password"
                     placeholder="Password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)} // Update password state
+                    onChange={(e) => setPassword(e.target.value)}
                     required
                   />
                 </div>
                 <span
-                  className="toggle-password ri-eye-line cursor-pointer position-absolute end-0 top-50 translate-middle-y me-16 text-secondary-light"
-                  data-toggle="#your-password"
+                  onClick={togglePasswordVisibility}
+                  className={`toggle-password cursor-pointer position-absolute end-0 top-50 translate-middle-y me-16 ${
+                    showPassword ? "ri-eye-off-line" : "ri-eye-line"
+                  }`}
+                  style={{ fontSize: "1.5rem", color: "#6c757d" }}
                 />
               </div>
-              <span className="mt-12 text-sm text-secondary-light">
+              <span className="mt-12 text-sm text-secondary-light d-block">
                 Your password must have at least 8 characters.
               </span>
             </div>
-            <div className="">
-              <div className="d-flex justify-content-between gap-2">
-                <div className="form-check style-check d-flex align-items-start">
-                  <input
-                    className="form-check-input border border-neutral-300 mt-4"
-                    type="checkbox"
-                    id="condition"
-                    required
-                  />
-                  <label
-                    className="form-check-label text-sm"
-                    htmlFor="condition"
-                  >
-                    By creating an account, you agree to the{" "}
-                    <Link to="#" className="text-primary-600 fw-semibold">
-                      Terms &amp; Conditions
-                    </Link>{" "}
-                    and our{" "}
-                    <Link to="#" className="text-primary-600 fw-semibold">
-                      Privacy Policy.
-                    </Link>
-                  </label>
-                </div>
-              </div>
+
+            {/* Terms and Conditions Checkbox */}
+            <div className="form-check style-check d-flex align-items-start">
+              <input
+                className="form-check-input border border-neutral-300 mt-4"
+                type="checkbox"
+                id="condition"
+                required
+              />
+              <label className="form-check-label text-sm" htmlFor="condition">
+                By creating an account, you agree to the{" "}
+                <Link to="#" className="text-primary-600 fw-semibold">
+                  Terms &amp; Conditions
+                </Link>{" "}
+                and our{" "}
+                <Link to="#" className="text-primary-600 fw-semibold">
+                  Privacy Policy
+                </Link>
+              </label>
             </div>
-            {/* Submit button */}
+
+            {/* Submit Button */}
             <button
               type="submit"
               className="btn btn-primary text-sm btn-sm px-12 py-16 w-100 radius-12 mt-32"
             >
               Sign Up
             </button>
+
+            {/* Social Sign-up Section */}
             <div className="mt-32 center-border-horizontal text-center">
               <span className="bg-base z-1 px-4">Or sign up with</span>
             </div>
-            {/* Social media sign-up buttons */}
             <div className="mt-32 d-flex align-items-center gap-3">
               <button
                 type="button"
@@ -169,7 +193,8 @@ const SignUpLayer = () => {
                 Google
               </button>
             </div>
-            {/* Link to Sign In */}
+
+            {/* Sign In Link */}
             <div className="mt-32 text-center text-sm">
               <p className="mb-0">
                 Already have an account?{" "}
