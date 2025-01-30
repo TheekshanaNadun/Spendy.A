@@ -85,6 +85,53 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+
+    async function fetchExchangeRate() {
+        try {
+            // Get current date in YYYY-MM-DD format
+            const today = new Date().toISOString().split('T')[0];
+
+            // Check localStorage for saved exchange rate and date
+            const savedData = JSON.parse(localStorage.getItem('exchangeRateData'));
+
+            if (savedData && savedData.date === today) {
+                // Use cached data if it's from today
+                document.getElementById('exchangeRate').textContent = `LKR ${parseFloat(savedData.rate).toFixed(2)}`;
+                console.log("Using cached exchange rate:", savedData.rate);
+                return;
+            }
+
+            // If no valid cached data, fetch from API
+            const apiUrl = 'https://fcsapi.com/api-v3/forex/latest?symbol=USD/LKR&access_key=OdGhIdCptw9P4Nd6GvHoOTwjz';
+            const response = await fetch(apiUrl);
+            const data = await response.json();
+
+            if (data && data.response && data.response[0]) {
+                // Extract the USD to LKR rate from the "c" field
+                const usdToLkrRate = data.response[0].c;
+
+                // Update the HTML element with the fetched rate
+                document.getElementById('exchangeRate').textContent = `LKR ${parseFloat(usdToLkrRate).toFixed(2)}`;
+
+                // Save the fetched rate and today's date in localStorage
+                localStorage.setItem(
+                    'exchangeRateData',
+                    JSON.stringify({ rate: usdToLkrRate, date: today })
+                );
+
+                console.log("Fetched and saved new exchange rate:", usdToLkrRate);
+            } else {
+                document.getElementById('exchangeRate').textContent = 'Data unavailable';
+            }
+        } catch (error) {
+            console.error('Error fetching exchange rate:', error);
+            document.getElementById('exchangeRate').textContent = 'Error loading data';
+        }
+    }
+
+    // Call the function on page load
+    fetchExchangeRate();
+
     // Tab handling
     tabBtns.forEach(btn => {
         btn.addEventListener('click', () => {

@@ -191,3 +191,38 @@
   .voiceButton.listening {
     background-color: #d1e9d5 !important;
   }  
+  .floatingMessage {
+    position: absolute;
+    bottom: 80px;
+    right: 20px;
+    background-color: #fff;
+    padding: 12px 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    max-width: 280px;
+    font-size: 14px;
+    color: #333;
+    z-index: 1000;
+    animation: float 2s ease-in-out infinite;
+  }
+  
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-5px);
+    }
+  }
+  
+  .floatingMessage::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    right: 24px;
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 8px solid #fff;
+  }

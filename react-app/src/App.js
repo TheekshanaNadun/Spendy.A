@@ -102,6 +102,20 @@ function App() {
               />
             }
           />
+          <Route
+            path="/homepage/about"
+            element={
+              <iframe
+                src={`/homepage/about.html${isAuthenticated ? '?authenticated=true' : ''}`}
+                title="Spendy.AI About"
+                style={{ width: "100%", height: "100vh", border: "none" }}
+              />
+            }
+          />
+
+
+         
+          
           <Route path="/sign-in" element={<SignInPage />} />
           <Route path="/sign-up" element={<SignUpPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />

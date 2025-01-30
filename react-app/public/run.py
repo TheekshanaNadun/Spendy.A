@@ -1,29 +1,55 @@
 import os
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, session
 import requests
 import pyodbc
 from datetime import datetime
 from dotenv import load_dotenv
+from flask_cors import CORS
 
-# Initialize Flask app
-app = Flask(__name__)  
+app = Flask(__name__)
+
+# Configure session settings
+app.secret_key = os.getenv("FLASK_SECRET_KEY", os.urandom(24))
+app.config.update(
+    SESSION_COOKIE_SAMESITE='None',
+    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_HTTPONLY=True,
+    PERMANENT_SESSION_LIFETIME=3600
+)
+
+# Configure CORS
+CORS(app, 
+    resources={
+        r"/process_message": {
+            "origins": "http://localhost:3000",
+            "methods": ["POST", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"],
+            "supports_credentials": True
+        }
+    }
+)
+
+@app.after_request
+def add_cors_headers(response):
+    response.headers["Access-Control-Allow-Origin"] = "http://localhost:3000"
+    response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    return response
 
 # Load environment variables
 load_dotenv()
 
 # Configure Kluster AI API
 KLUSTER_API_URL = "https://api.kluster.ai/v1/chat/completions"
-KLUSTER_API_KEY = os.getenv("KLUSTER_API_KEY")  # API key from environment variables
+KLUSTER_API_KEY = os.getenv("KLUSTER_API_KEY")
 
 # Configure SQL Server connection
-server = os.getenv("SQL_SERVER")  # Fetch server from environment variables
-database = os.getenv("SQL_DATABASE")  # Fetch database name from environment variables
+server = os.getenv("SQL_SERVER")
+database = os.getenv("SQL_DATABASE")
 connection_string = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server};DATABASE={database};Trusted_Connection=yes"
 
 def call_kluster_api(message):
-    """
-    Calls the Kluster AI API to extract structured data from a user message.
-    """
     payload = {
         "model": "klusterai/Meta-Llama-3.1-8B-Instruct-Turbo",
         "messages": [
@@ -41,82 +67,70 @@ def call_kluster_api(message):
 
     try:
         response = requests.post(KLUSTER_API_URL, json=payload, headers=headers)
-        response.raise_for_status()  # Raise an error for HTTP codes >= 400
+        response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
         print(f"Error calling Kluster API: {e}")
         return None
 
 def parse_kluster_response(response):
-    """
-    Parses the Kluster API response to extract structured fields.
-    """
     try:
-        # Validate response structure
         if not response or 'choices' not in response or len(response['choices']) == 0:
             raise ValueError("'choices' key not found or is empty in Kluster API response")
 
-        # Extract content
         content = response["choices"][0]["message"]["content"]
         print("Kluster API Response:", response)
 
-        # Initialize default parsed data
         parsed_data = {
             "item": "Unknown",
             "location": "Unknown",
             "price": 0,
-            "date": datetime.now().strftime("%Y-%m-%d"),  # Default to current date
+            "date": datetime.now().strftime("%Y-%m-%d"),
             "category": "Uncategorized",
             "type": "Expense",
-            "timestamp": datetime.now().strftime("%H:%M:%S"),  # Only current time (not date and time)
+            "timestamp": datetime.now().strftime("%H:%M:%S"),
             "latitude": None,
             "longitude": None
         }
+        print("Initial parsed data:", parsed_data)
 
-        # Process each line of the content
         for line in content.split("\n"):
             line = line.strip("- ").strip()
+            print(f"Processing line: {line}")
 
-            # Check for date
             if "date" in line.lower():
                 date_str = line.split(":")[1].strip()
                 try:
-                    parsed_date = datetime.strptime(date_str, "%b %d")  # Example: "Jan 24"
+                    parsed_date = datetime.strptime(date_str, "%b %d")
                     parsed_date = parsed_date.replace(year=datetime.now().year)
                     parsed_data["date"] = parsed_date.strftime("%Y-%m-%d")
                 except ValueError:
-                    print(f"Invalid date format: {date_str}. Using current date: {parsed_data['date']}.")
+                    print(f"Invalid date format: {date_str}")
 
-            # Check for location (store)
             elif "location" in line.lower() or "store" in line.lower():
                 parsed_data["location"] = line.split(":")[1].strip()
 
-            # Check for price
             elif "price" in line.lower() or "amount" in line.lower():
                 price_str = line.split(":")[1].strip().replace("Rs.", "").replace(",", "").strip()
-                
-                # If the price is a string, attempt to convert it to an integer
                 try:
-                    parsed_data["price"] = int(price_str)  # Convert to integer
+                    parsed_data["price"] = int(price_str)
                 except ValueError:
-                    print(f"Invalid price format: {price_str}. Defaulting to 0.")
-                    parsed_data["price"] = 0  # Default to 0 if price is invalid
+                    print(f"Invalid price format: {price_str}")
 
-
-            # Check for category
             elif "category" in line.lower():
                 parsed_data["category"] = line.split(":")[1].strip()
 
-            # Check for item
             elif "item" in line.lower():
                 parsed_data["item"] = line.split(":")[1].strip()
 
-        # Capitalize the first letter of each string value
+            elif "type" in line.lower():
+                parsed_data["type"] = line.split(":")[1].strip()
+
         for key, value in parsed_data.items():
             if isinstance(value, str) and value != "Unknown" and value != "Uncategorized":
                 parsed_data[key] = value.capitalize()
 
-        # Ensure all expected fields are present
+        print("Final parsed data:", parsed_data)
         return parsed_data
 
     except Exception as e:
@@ -124,9 +138,6 @@ def parse_kluster_response(response):
         return {"error": str(e)}
 
 def get_db_connection():
-    """
-    Establishes a connection to the SQL Server database.
-    """
     try:
         conn = pyodbc.connect(connection_string)
         return conn
@@ -135,78 +146,80 @@ def get_db_connection():
         raise
 
 def store_in_database(data):
-    """
-    Inserts parsed data into the SQL Server database.
-    """
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
 
         query = """
-            INSERT INTO transactions (item, price, date, category, location, type, timestamp, latitude, longitude)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO transactions 
+            (user_id, item, price, date, category, location, type, timestamp, latitude, longitude)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
 
         cursor.execute(query, (
+            data.get('user_id'),
             data.get('item', 'Unknown'),
             data.get('price', 0),
-            data.get('date', '2025-01-01'),
+            data.get('date', datetime.now().strftime("%Y-%m-%d")),
             data.get('category', 'Uncategorized'),
             data.get('location', 'Unknown'),
             data.get('type', 'Expense'),
-            data.get('timestamp', datetime.now().strftime("%H:%M:%S")),  # Only current time (not date and time)
-            data.get('latitude', None),  # Latitude (can be None if not provided)
-            data.get('longitude', None)  # Longitude (can be None if not provided)
+            data.get('timestamp', datetime.now().strftime("%H:%M:%S")),
+            data.get('latitude'),
+            data.get('longitude')
         ))
 
         conn.commit()
         cursor.close()
         conn.close()
-        
         print("Data successfully inserted into the database.")
     
     except Exception as e:
         print(f"Error inserting into database: {e}")
         raise
 
-@app.route('/process_message', methods=['POST'])
+@app.route('/process_message', methods=['POST', 'OPTIONS'])
 def process_message():
-    """
-    Processes user messages by extracting structured data using Kluster AI API and storing it in the database.
-    """
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+        
     try:
+        if 'user_id' not in session:
+            return jsonify({"error": "User not logged in"}), 401
+
+        user_id = session['user_id']
+        print(f"Processing message for user_id: {user_id}")
+
         message = request.json.get('message')
         latitude = request.json.get('latitude')
         longitude = request.json.get('longitude')
 
         if not message or not message.strip():
-            return jsonify({"error": "Message is required and cannot be empty"}), 400
+            return jsonify({"error": "Message is required"}), 400
 
-        # Call Kluster API for data extraction
         kluster_response = call_kluster_api(message)
-
         if not kluster_response or 'choices' not in kluster_response:
-            return jsonify({"error": "'choices' key not found in Kluster API response"}), 500
+            return jsonify({"error": "Invalid Kluster API response"}), 500
 
-        # Parse the Kluster API response
         structured_data = parse_kluster_response(kluster_response)
-
         if not structured_data or 'error' in structured_data:
-            return jsonify({"error": f"Failed to parse Kluster response: {structured_data.get('error')}"}), 500
+            return jsonify({"error": "Failed to parse response"}), 500
 
-        # Add geolocation data if available
+        structured_data["user_id"] = user_id
         if latitude and longitude:
             structured_data["latitude"] = latitude
             structured_data["longitude"] = longitude
 
-        # Store extracted data in the database
         store_in_database(structured_data)
 
-        # Return the extracted data as a response
-        return jsonify({"status": "success", "data": structured_data})
+        return jsonify({
+            "status": "success",
+            "data": structured_data
+        })
 
     except Exception as e:
+        print(f"Error processing message: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=3001)

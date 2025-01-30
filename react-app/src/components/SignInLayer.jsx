@@ -1,43 +1,36 @@
 import { Icon } from "@iconify/react/dist/iconify.js";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
-import Swal from "sweetalert2"; // Import SweetAlert2
+import Swal from "sweetalert2";
 
 axios.defaults.withCredentials = true;
 
 const SignInLayer = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false); // State for toggling password visibility
+  const [showPassword, setShowPassword] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const navigate = useNavigate();
 
-  // Handle form submission
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate("/dashboard");
+    }
+  }, [isAuthenticated, navigate]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-  
     try {
       const response = await axios.post("http://localhost:5000/api/login", {
         email,
         password
       });
-  
-      await Swal.fire({
-        icon: "success",
-        title: "Login Successful",
-        text: response.data.message,
-        confirmButtonText: "OK",
-        allowOutsideClick: false
-      });
-  
-      // Add a small delay before checking session
-      setTimeout(async () => {
-        const sessionCheck = await axios.get("http://localhost:5000/api/session-check");
-        if (sessionCheck.data.authenticated) {
-          navigate("/dashboard", { replace: true });
-        }
-      }, 100);
-  
+      
+      if (response.data) {
+        localStorage.setItem("token", response.data.token);
+        window.location.href = "/dashboard?showWelcome=true";
+      }
     } catch (error) {
       Swal.fire({
         icon: "error",
@@ -47,8 +40,9 @@ const SignInLayer = () => {
       });
     }
   };
+  
 
-
+  // Rest of the JSX remains the same
   return (
     <section className="auth bg-base d-flex flex-wrap">
       <div className="auth-left d-lg-block d-none">
@@ -78,7 +72,7 @@ const SignInLayer = () => {
                 className="form-control h-56-px bg-neutral-50 radius-12"
                 placeholder="Email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)} // Update email state
+                onChange={(e) => setEmail(e.target.value)}
                 required
               />
             </div>
@@ -90,18 +84,17 @@ const SignInLayer = () => {
                   <Icon icon="solar:lock-password-outline" />
                 </span>
                 <input
-                  type={showPassword ? "text" : "password"} // Toggle between text and password types
+                  type={showPassword ? "text" : "password"}
                   className="form-control h-56-px bg-neutral-50 radius-12"
                   id="your-password"
                   placeholder="Password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)} // Update password state
+                  onChange={(e) => setPassword(e.target.value)}
                   required
                 />
               </div>
-              {/* Show/Hide Password Button */}
               <span
-                onClick={() => setShowPassword(!showPassword)} // Toggle showPassword state
+                onClick={() => setShowPassword(!showPassword)}
                 className={`toggle-password cursor-pointer position-absolute end-0 top-50 translate-middle-y me-16 ${
                   showPassword ? "ri-eye-off-line" : "ri-eye-line"
                 }`}
@@ -110,22 +103,20 @@ const SignInLayer = () => {
             </div>
 
             {/* Remember Me and Forgot Password */}
-            <div className="">
-              <div className="d-flex justify-content-between gap-2">
-                <div className="form-check style-check d-flex align-items-center">
-                  <input
-                    className="form-check-input border border-neutral-300"
-                    type="checkbox"
-                    id="remember"
-                  />
-                  <label className="form-check-label" htmlFor="remember">
-                    Remember me{" "}
-                  </label>
-                </div>
-                <Link to="#" className="text-primary-600 fw-medium">
-                  Forgot Password?
-                </Link>
+            <div className="d-flex justify-content-between gap-2">
+              <div className="form-check style-check d-flex align-items-center">
+                <input
+                  className="form-check-input border border-neutral-300"
+                  type="checkbox"
+                  id="remember"
+                />
+                <label className="form-check-label" htmlFor="remember">
+                  Remember me{" "}
+                </label>
               </div>
+              <Link to="#" className="text-primary-600 fw-medium">
+                Forgot Password?
+              </Link>
             </div>
 
             {/* Submit Button */}
@@ -141,7 +132,6 @@ const SignInLayer = () => {
               <span className="bg-base z-1 px-4">Or sign in with</span>
             </div>
             <div className="mt-32 d-flex align-items-center gap-3">
-              {/* Facebook Button */}
               <button
                 type="button"
                 className="fw-semibold text-primary-light py-16 px-24 w-50 border radius-12 text-md d-flex align-items-center justify-content-center gap-12 line-height-1 bg-hover-primary-50"
@@ -152,8 +142,6 @@ const SignInLayer = () => {
                 />
                 Facebook
               </button>
-
-              {/* Google Button */}
               <button
                 type="button"
                 className="fw-semibold text-primary-light py-16 px-24 w-50 border radius-12 text-md d-flex align-items-center justify-content-center gap-12 line-height-1 bg-hover-primary-50"
@@ -169,7 +157,7 @@ const SignInLayer = () => {
             {/* Sign Up Link */}
             <div className="mt-32 text-center text-sm">
               <p className="mb-0">
-                Don’t have an account?{" "}
+                Don't have an account?{" "}
                 <Link to="/sign-up" className="text-primary-600 fw-semibold">
                   Sign Up
                 </Link>

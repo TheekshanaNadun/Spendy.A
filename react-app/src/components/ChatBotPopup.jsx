@@ -6,80 +6,114 @@ import styles from './ChatBotPopup.module.css';
 const ChatBotPopup = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [showFloatingMessage, setShowFloatingMessage] = useState(true);
   const [messages, setMessages] = useState([
-    { text: "Hi! How can I help you today?", isBot: true },
-    { text: "What features are you looking for?", isBot: true }
+    { text: "Hi! I'm Spendy.AI", isBot: true },
+    { text: "Just tell me what you bought, I will add the record by myself", isBot: true }
   ]);
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isListening, setIsListening] = useState(false);
+  const [geoLocation, setGeoLocation] = useState({ lat: null, lng: null });
 
   useEffect(() => {
     setMounted(true);
-    return () => setMounted(false);
+    getGeoLocation();
+    
+    const timer = setTimeout(() => setShowFloatingMessage(false), 5000);
+    return () => {
+      clearTimeout(timer);
+      setMounted(false);
+    };
   }, []);
 
-  // Rate limiting
-  const [lastMessageTime, setLastMessageTime] = useState(0);
-  const RATE_LIMIT_MS = 1000; // 1 second between messages
-
-  const sanitizeInput = (input) => {
-    return input.replace(/[<>]/g, '');
+  const getGeoLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        position => {
+          console.log('Geolocation obtained:', position.coords);
+          setGeoLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+        },
+        error => {
+          console.error('Geolocation error:', error);
+          setError('Location access recommended for accurate tracking');
+        }
+      );
+    } else {
+      console.error('Geolocation not supported');
+      setError('Geolocation is not supported by this browser');
+    }
   };
 
   const sendMessageToServer = useCallback(async (message) => {
     try {
-      const response = await fetch('http://127.0.0.1:5000/process_message', {
+      console.log('Sending message with data:', {
+        message,
+        location: geoLocation
+      });
+
+      const response = await fetch('http://127.0.0.1:3001/process_message', {
         method: 'POST',
-        headers: {
+        headers: { 
           'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
+          'Authorization': `Bearer ${localStorage.getItem('token')}` // Add auth token if using JWT
         },
         credentials: 'include',
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           message: message,
-          timestamp: new Date().toISOString(),
-          clientId: sessionStorage.getItem('clientId')
+          latitude: geoLocation.lat,
+          longitude: geoLocation.lng
         })
       });
 
+      console.log('Server response status:', response.status);
+      const responseData = await response.json();
+      console.log('Server response data:', responseData);
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(responseData.error || `HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
-      return data.response;
+      return responseData;
     } catch (error) {
-      console.error('Error:', error);
-      throw new Error('Failed to get response from server');
+      console.error('API Error:', error);
+      throw error;
     }
-  }, []);
+  }, [geoLocation]);
 
   const handleSendMessage = async () => {
-    const now = Date.now();
-    if (now - lastMessageTime < RATE_LIMIT_MS) {
-      setError("Please wait a moment before sending another message");
-      return;
-    }
-
-    const sanitizedInput = sanitizeInput(inputText.trim());
+    const sanitizedInput = inputText.trim().replace(/[<>]/g, '');
     if (!sanitizedInput) return;
 
     try {
       setIsLoading(true);
       setError(null);
-      setLastMessageTime(now);
 
+      console.log('Sending message:', sanitizedInput);
       setMessages(prev => [...prev, { text: sanitizedInput, isBot: false }]);
       setInputText("");
 
-      const botResponse = await sendMessageToServer(sanitizedInput);
-      setMessages(prev => [...prev, { text: botResponse, isBot: true }]);
+      const responseData = await sendMessageToServer(sanitizedInput);
+      
+      if (responseData.status === 'success') {
+        console.log('Message processed successfully:', responseData.data);
+        setMessages(prev => [...prev, { 
+          text: `Added: ${responseData.data.item} (₹${responseData.data.price})`, 
+          isBot: true 
+        }]);
+      } else {
+        throw new Error(responseData.error || 'Unknown server error');
+      }
+
     } catch (error) {
-      setError("Failed to get response. Please try again later.");
+      console.error('Message handling error:', error);
+      setError(error.message);
       setMessages(prev => [...prev, { 
-        text: "Sorry, I'm having trouble connecting to the server.", 
+        text: "Sorry, I'm having trouble processing your request.", 
         isBot: true 
       }]);
     } finally {
@@ -99,7 +133,6 @@ const ChatBotPopup = () => {
     recognition.lang = 'en-US';
     recognition.continuous = false;
     recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
 
     recognition.start();
     setIsListening(true);
@@ -107,6 +140,7 @@ const ChatBotPopup = () => {
 
     recognition.onresult = (event) => {
       const transcript = event.results[0][0].transcript;
+      console.log('Voice recognition result:', transcript);
       setInputText(transcript);
       setIsListening(false);
     };
@@ -117,9 +151,7 @@ const ChatBotPopup = () => {
       setIsListening(false);
     };
 
-    recognition.onend = () => {
-      setIsListening(false);
-    };
+    recognition.onend = () => setIsListening(false);
   };
 
   const handleKeyPress = (e) => {
@@ -129,18 +161,24 @@ const ChatBotPopup = () => {
     }
   };
 
-  useEffect(() => {
-    if (!sessionStorage.getItem('clientId')) {
-      sessionStorage.setItem('clientId', `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
-    }
-  }, []);
-
   if (!mounted) return null;
 
   return (
     <div className={styles.root}>
       <div className={styles.container}>
         <AnimatePresence mode="wait">
+          {showFloatingMessage && !isOpen && (
+            <motion.div
+              className={styles.floatingMessage}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              transition={{ duration: 0.3 }}
+            >
+              Just tell me what you bought, I will add the record by myself
+            </motion.div>
+          )}
+          
           {isOpen ? (
             <motion.div
               className={styles.popup}
@@ -175,7 +213,9 @@ const ChatBotPopup = () => {
                 ))}
                 {isLoading && (
                   <div className={styles.loading}>
-                    Thinking...
+                    <div className={styles.loadingDot}></div>
+                    <div className={styles.loadingDot}></div>
+                    <div className={styles.loadingDot}></div>
                   </div>
                 )}
                 {error && (
@@ -198,17 +238,17 @@ const ChatBotPopup = () => {
                 />
                 <button 
                   className={`${styles.voiceButton} ${isListening ? styles.listening : ''}`}
-                  aria-label="Voice input"
                   onClick={startVoiceRecognition}
                   disabled={isLoading || isListening}
+                  aria-label={isListening ? "Listening..." : "Voice input"}
                 >
                   <Mic size={20} />
                 </button>
                 <button 
                   className={styles.sendButton} 
-                  aria-label="Send message"
                   onClick={handleSendMessage}
                   disabled={isLoading || !inputText.trim()}
+                  aria-label="Send message"
                 >
                   <Send size={20} />
                 </button>
@@ -216,7 +256,10 @@ const ChatBotPopup = () => {
             </motion.div>
           ) : (
             <motion.button
-              onClick={() => setIsOpen(true)}
+              onClick={() => {
+                setIsOpen(true);
+                setShowFloatingMessage(false);
+              }}
               className={styles.toggleButton}
               aria-label="Open chat"
               initial={{ scale: 0 }}
