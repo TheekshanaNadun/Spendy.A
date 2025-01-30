@@ -54,17 +54,28 @@ def login():
         return jsonify({}), 200
     
     try:
-        session.permanent = True
-        session['user_id'] = 1  # Mock user ID
-        print(f"Login successful. Session data: {dict(session)}")
-        return jsonify({
-            "status": "success",
-            "message": "Logged in successfully",
-            "user_id": session['user_id']
-        })
+        auth_response = requests.get(
+            'http://localhost:5000/api/session-check',
+            cookies=request.cookies,
+            headers=request.headers
+        )
+        
+        if auth_response.status_code == 200:
+            data = auth_response.json()
+            if data.get('authenticated'):
+                session.permanent = True
+                session['user_id'] = data['user']['user_id']
+                return jsonify({
+                    "status": "success",
+                    "message": "Logged in successfully",
+                    "user_id": session['user_id']
+                })
+        
+        return jsonify({"error": "Authentication failed"}), 401
     except Exception as e:
         print(f"Login error: {str(e)}")
         return jsonify({"error": "Login failed"}), 500
+
 
 # Add this debug route
 @app.route('/debug_session', methods=['GET'])
@@ -78,11 +89,22 @@ def debug_session():
 # Add a session check route
 @app.route('/check_session', methods=['GET'])
 def check_session():
-    print("Current session:", dict(session))
-    return jsonify({
-        "authenticated": 'user_id' in session,
-        "user_id": session.get('user_id')
-    })
+    try:
+        auth_response = requests.get(
+            'http://localhost:5000/api/session-check',
+            cookies=request.cookies,
+            headers=request.headers
+        )
+        if auth_response.status_code == 200:
+            data = auth_response.json()
+            return jsonify({
+                "authenticated": data.get('authenticated'),
+                "user_id": data.get('user', {}).get('user_id')
+            })
+        return jsonify({"authenticated": False}), 401
+    except Exception as e:
+        print(f"Session check error: {str(e)}")
+        return jsonify({"authenticated": False}), 500
 
 def call_kluster_api(message):
     payload = {

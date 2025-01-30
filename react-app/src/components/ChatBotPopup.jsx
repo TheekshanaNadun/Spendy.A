@@ -105,7 +105,7 @@ const ChatBotPopup = () => {
       
       if (responseData.status === 'success') {
         setMessages(prev => [...prev, { 
-          text: `Added: ${responseData.data.item} (₹${responseData.data.price})`, 
+          text: `Added: ${responseData.data.item} (LKR${responseData.data.price})`, 
           isBot: true 
         }]);
       } else {
