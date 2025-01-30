@@ -1,228 +1,207 @@
-.root {
-    display: block !important;
-    position: relative !important;
-    font-family: -apple-system, BlinkMacSystemFont, sans-serif !important;
+.container {
+  position: fixed !important;
+  border-radius: 12px 12px !important;
+  bottom: 20px !important;
+  right: 20px !important;
+  z-index: 1000 !important;
+}
+
+.toggleButton {
+  background: #ff9f31 !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 50% !important;
+  width: 70px !important;
+  height: 70px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  box-shadow: 0 4px 12px rgba(108, 92, 231, 0.2) !important;
+  transition: all 0.3s ease !important;
+  opacity: 1 !important;
+}
+
+.toggleButton.hidden {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.popup {
+  background: rgb(159, 230, 200) !important;
+  border-radius: 12px 12px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1) !important;
+  width: 490px !important;
+  height: 600px !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+@media (max-width: 480px) {
+  .popup {
+    width: 100vw !important;
+    height: 100vh !important;
+    border-radius: 0 !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
   }
   
   .container {
-    position: fixed !important;
-    bottom: 24px !important;
-    right: 24px !important;
-    z-index: 2147483647 !important;
-    font-family: inherit !important;
+    bottom: 10px !important;
+    right: 10px !important;
   }
-  
-  .popup {
-    all: initial !important;
-    background-color: #ffffff !important;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2) !important;
-    border-radius: 16px !important;
-    width: 400px !important;
-    height: 500px !important;
-    display: flex !important;
-    flex-direction: column !important;
-    position: relative !important;
-    transform-origin: bottom right !important;
-    font-family: inherit !important;
-    overflow: hidden !important;
-  }
-  
-  .header {
-    all: initial !important;
-    display: flex !important;
-    justify-content: space-between !important;
-    align-items: center !important;
-    padding: 16px !important;
-    background-color: #e6f4ea !important;
-    border-top-left-radius: 16px !important;
-    border-top-right-radius: 16px !important;
-    font-family: inherit !important;
-  }
-  
-  .title {
-    all: initial !important;
-    margin: 0 !important;
-    font-size: 18px !important;
-    font-weight: 600 !important;
-    color: #2d6a4f !important;
-    font-family: inherit !important;
-    display: block !important;
-  }
-  
-  .closeButton {
-    all: initial !important;
-    background: none !important;
-    border: none !important;
-    color: #2d6a4f !important;
-    cursor: pointer !important;
-    padding: 4px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    font-family: inherit !important;
-  }
-  
-  .chatBody {
-    all: initial !important;
-    flex: 1 !important;
-    padding: 16px !important;
-    overflow-y: auto !important;
-    color: #495057 !important;
-    font-size: 14px !important;
-    display: block !important;
-    font-family: inherit !important;
-  }
-  
-  .text {
-    all: initial !important;
-    display: block !important;
-    margin-bottom: 12px !important;
-    color: #495057 !important;
-    font-size: 14px !important;
-    font-family: inherit !important;
-  }
-  
-  .message {
-    all: initial !important;
-    background-color: #f1faee !important;
-    padding: 12px !important;
-    border-radius: 8px !important;
-    margin-bottom: 12px !important;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1) !important;
-    display: block !important;
-    font-family: inherit !important;
-  }
-  
-  .inputContainer {
-    all: initial !important;
-    padding: 16px !important;
-    border-top: 1px solid #dee2e6 !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 8px !important;
-    background: white !important;
-    border-bottom-left-radius: 16px !important;
-    border-bottom-right-radius: 16px !important;
-  }
-  
-  .input {
-    all: initial !important;
-    flex: 1 !important;
-    padding: 10px 12px !important;
-    border: 1px solid #ced4da !important;
-    border-radius: 8px !important;
-    outline: none !important;
-    font-size: 14px !important;
-    font-family: inherit !important;
-    background: white !important;
-    color: #000 !important;
-  }
-  .headerLeft {
-    display: flex !important;
-    align-items: center !important;
-    gap: 8px !important;
-  }
-  
-  .botIcon {
-    color: #2d6a4f !important;
-  }
-  
-  .voiceButton, .sendButton {
-    all: initial !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    padding: 8px !important;
-    border-radius: 8px !important;
-    cursor: pointer !important;
-    background: #e6f4ea !important;
-    color: #2d6a4f !important;
-    border: none !important;
-  }
-  
-  .voiceButton:hover, .sendButton:hover {
-    background: #d1e9d5 !important;
-  }
-  
-  
-  .input:focus {
-    border-color: #38b000 !important;
-    box-shadow: 0 0 4px rgba(56, 176, 0, 0.5) !important;
-  }
-  
-  .toggleButton {
-    all: initial !important;
-    background-color: #38b000 !important;
-    color: #ffffff !important;
-    padding: 12px !important;
-    border-radius: 50% !important;
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2) !important;
-    cursor: pointer !important;
-    border: none !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    font-family: inherit !important;
-  }
-  
-  .toggleButton:hover {
-    background-color: #2d6a4f !important;
-  }
-  .loading {
-    padding: 8px !important;
-    text-align: center !important;
-    color: #666 !important;
-    font-style: italic !important;
-  }
-  
-  .error {
-    padding: 8px !important;
-    color: #dc3545 !important;
-    background-color: #f8d7da !important;
-    border-radius: 4px !important;
-    margin: 8px 0 !important;
-    text-align: center !important;
-  }
-  .voiceButton[disabled] {
-    opacity: 0.5 !important;
-    cursor: not-allowed !important;
-  }
-  
-  .voiceButton.listening {
-    background-color: #d1e9d5 !important;
-  }  
-  .floatingMessage {
-    position: absolute;
-    bottom: 80px;
-    right: 20px;
-    background-color: #fff;
-    padding: 12px 20px;
-    border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    max-width: 280px;
-    font-size: 14px;
-    color: #333;
-    z-index: 1000;
-    animation: float 2s ease-in-out infinite;
-  }
-  
-  @keyframes float {
-    0%, 100% {
-      transform: translateY(0);
-    }
-    50% {
-      transform: translateY(-5px);
-    }
-  }
-  
-  .floatingMessage::after {
-    content: '';
-    position: absolute;
-    bottom: -8px;
-    right: 24px;
-    width: 0;
-    height: 0;
-    border-left: 8px solid transparent;
-    border-right: 8px solid transparent;
-    border-top: 8px solid #fff;
-  }
+}
+
+.header {
+  padding: 12px 16px !important;
+  background: #ffa268 !important;
+  color: white !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  border-radius: 12px 12px 0 0 !important;
+}
+
+.header h3 {
+  font-size: 16px !important;
+  margin: 0 !important;
+  font-weight: 500 !important;
+}
+
+.botIcon {
+  width: 20px !important;
+  height: 20px !important;
+}
+
+.closeButton {
+  margin-left: auto !important;
+  background: transparent !important;
+  border: none !important;
+  color: white !important;
+  cursor: pointer !important;
+  padding: 4px !important;
+}
+
+.chatArea {
+  flex: 1 !important;
+  padding: 16px 26px !important;
+  overflow-y: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  background: rgb(246, 238, 233) !important;
+}
+
+.message {
+  max-width: 85% !important;
+  padding: 10px 14px !important;
+  border-radius: 12px !important;
+  font-size: 14px !important;
+}
+
+.botMsg {
+  background: white !important;
+  color: #333 !important;
+  align-self: flex-start !important;
+  border-bottom-left-radius: 4px !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+}
+
+.userMsg {
+  background: #6c5ce7 !important;
+  color: white !important;
+  align-self: flex-end !important;
+  border-bottom-right-radius: 4px !important;
+}
+
+.inputContainer {
+  padding: 12px !important;
+  border-radius: 12px 12px !important;
+
+  border-top: 1px solid #eee !important;
+  background: rgb(246, 238, 233) !important;
+}
+
+.inputWrapper {
+  display: flex !important;
+  gap: 8px !important;
+}
+
+.inputField {
+  flex: 1 !important;
+  padding: 8px 12px !important;
+  border: 1px solid #e0e0e0 !important;
+  border-radius: 8px !important;
+  font-size: 14px !important;
+}
+
+.voiceButton{
+  background: #e03333 !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 8px !important;
+  width: 36px !important;
+  height: 36px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+}
+.sendButton {
+  background: #518bf0 !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 8px !important;
+  width: 36px !important;
+  height: 36px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+}
+.voiceButton.listening {
+  animation: pulse 1.5s infinite !important;
+}
+
+.loading {
+  display: flex !important;
+  gap: 4px !important;
+  padding: 8px !important;
+  align-self: flex-start !important;
+}
+
+.loadingDot {
+  width: 6px !important;
+  height: 6px !important;
+  background: #6c5ce7 !important;
+  border-radius: 50% !important;
+  animation: bounce 0.5s infinite alternate !important;
+}
+
+.error {
+  background: #fee2e2 !important;
+  color: #dc2626 !important;
+  padding: 8px 12px !important;
+  border-radius: 8px !important;
+  font-size: 13px !important;
+  margin: 8px 0 !important;
+}
+
+@keyframes bounce {
+  to { transform: translateY(-4px) !important; }
+}
+
+@keyframes pulse {
+  50% { opacity: 0.5 !important; }
+}
+
+.locationStatus {
+  font-size: 12px !important;
+  color: #666 !important;
+  text-align: center !important;
+  margin-top: 6px !important;
+}

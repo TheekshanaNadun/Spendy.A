@@ -53,6 +53,19 @@ class User(db.Model):
     monthly_limit = db.Column(db.Integer, default=0)
     profile_image = db.Column(db.LargeBinary)
 
+class Transaction(db.Model):
+    __tablename__ = 'transactions'
+    transaction_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
+    item = db.Column(db.String(255))
+    price = db.Column(db.Integer)
+    date = db.Column(db.Date, nullable=False)
+    location = db.Column(db.String(255))
+    category = db.Column(db.String(100))
+    type = db.Column(db.String(50))
+    timestamp = db.Column(db.Time)
+    latitude = db.Column(db.Float)
+    longitude = db.Column(db.Float)
 
 # Create tables
 with app.app_context():
@@ -161,7 +174,7 @@ def logout():
 @app.route('/api/session-check', methods=['GET'])
 def session_check():
     if 'authenticated' in session:
-        user = db.session.get(User, session['user_id'])
+        user = User.query.get(session['user_id'])
         if user:
             return jsonify({
                 "authenticated": True,
@@ -172,6 +185,85 @@ def session_check():
                 }
             }), 200
     return jsonify({"authenticated": False}), 401
+
+# Transaction routes
+@app.route('/api/transactions', methods=['POST'])
+@require_login
+def add_transaction():
+    try:
+        data = request.get_json()
+        required_fields = ['item', 'price', 'date']
+        if not all(field in data for field in required_fields):
+            return jsonify({"error": "Missing required fields"}), 400
+
+        try:
+            transaction_date = datetime.strptime(data['date'], '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({"error": "Invalid date format. Use YYYY-MM-DD"}), 400
+
+        new_transaction = Transaction(
+            user_id=session['user_id'],
+            item=data['item'],
+            price=data['price'],
+            date=transaction_date,
+            location=data.get('location'),
+            category=data.get('category'),
+            type=data.get('type'),
+            timestamp=data.get('timestamp'),
+            latitude=data.get('latitude'),
+            longitude=data.get('longitude')
+        )
+        db.session.add(new_transaction)
+        db.session.commit()
+        return jsonify({"message": "Transaction added successfully"}), 201
+
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Transaction creation error: {str(e)}")
+        return jsonify({"error": "Failed to create transaction"}), 500
+
+@app.route('/api/transactions', methods=['GET'])
+@require_login
+def get_transactions():
+    try:
+        transactions = Transaction.query.filter_by(user_id=session['user_id']).all()
+        return jsonify([{
+            "transaction_id": t.transaction_id,
+            "item": t.item,
+            "price": t.price,
+            "date": t.date.isoformat(),
+            "location": t.location,
+            "category": t.category,
+            "type": t.type,
+            "timestamp": t.timestamp.isoformat() if t.timestamp else None,
+            "latitude": t.latitude,
+            "longitude": t.longitude
+        } for t in transactions]), 200
+
+    except Exception as e:
+        app.logger.error(f"Transactions fetch error: {str(e)}")
+        return jsonify({"error": "Failed to fetch transactions"}), 500
+
+@app.route('/api/transactions/<int:transaction_id>', methods=['DELETE'])
+@require_login
+def delete_transaction(transaction_id):
+    try:
+        transaction = Transaction.query.filter_by(
+            transaction_id=transaction_id,
+            user_id=session['user_id']
+        ).first()
+
+        if not transaction:
+            return jsonify({"error": "Transaction not found"}), 404
+
+        db.session.delete(transaction)
+        db.session.commit()
+        return jsonify({"message": "Transaction deleted successfully"}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Transaction deletion error: {str(e)}")
+        return jsonify({"error": "Failed to delete transaction"}), 500
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
