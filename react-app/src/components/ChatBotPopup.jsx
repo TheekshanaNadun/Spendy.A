@@ -16,9 +16,11 @@ const ChatBotPopup = () => {
   const [error, setError] = useState(null);
   const [isListening, setIsListening] = useState(false);
   const [geoLocation, setGeoLocation] = useState({ lat: null, lng: null });
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+    checkAuthStatus();
     getGeoLocation();
     
     const timer = setTimeout(() => setShowFloatingMessage(false), 5000);
@@ -28,11 +30,24 @@ const ChatBotPopup = () => {
     };
   }, []);
 
+  const checkAuthStatus = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/session-check', {
+        credentials: 'include'
+      });
+      const data = await response.json();
+      setIsAuthenticated(data.authenticated);
+      console.log('Auth status:', data);
+    } catch (error) {
+      console.error('Auth check failed:', error);
+      setIsAuthenticated(false);
+    }
+  };
+
   const getGeoLocation = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         position => {
-          console.log('Geolocation obtained:', position.coords);
           setGeoLocation({
             lat: position.coords.latitude,
             lng: position.coords.longitude
@@ -43,25 +58,18 @@ const ChatBotPopup = () => {
           setError('Location access recommended for accurate tracking');
         }
       );
-    } else {
-      console.error('Geolocation not supported');
-      setError('Geolocation is not supported by this browser');
     }
   };
 
   const sendMessageToServer = useCallback(async (message) => {
     try {
-      console.log('Sending message with data:', {
-        message,
-        location: geoLocation
-      });
+      if (!isAuthenticated) {
+        throw new Error('Please login to continue');
+      }
 
       const response = await fetch('http://127.0.0.1:3001/process_message', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}` // Add auth token if using JWT
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
           message: message,
@@ -70,20 +78,17 @@ const ChatBotPopup = () => {
         })
       });
 
-      console.log('Server response status:', response.status);
-      const responseData = await response.json();
-      console.log('Server response data:', responseData);
-
       if (!response.ok) {
-        throw new Error(responseData.error || `HTTP error! status: ${response.status}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to process message');
       }
 
-      return responseData;
+      return await response.json();
     } catch (error) {
       console.error('API Error:', error);
       throw error;
     }
-  }, [geoLocation]);
+  }, [geoLocation, isAuthenticated]);
 
   const handleSendMessage = async () => {
     const sanitizedInput = inputText.trim().replace(/[<>]/g, '');
@@ -93,14 +98,12 @@ const ChatBotPopup = () => {
       setIsLoading(true);
       setError(null);
 
-      console.log('Sending message:', sanitizedInput);
       setMessages(prev => [...prev, { text: sanitizedInput, isBot: false }]);
       setInputText("");
 
       const responseData = await sendMessageToServer(sanitizedInput);
       
       if (responseData.status === 'success') {
-        console.log('Message processed successfully:', responseData.data);
         setMessages(prev => [...prev, { 
           text: `Added: ${responseData.data.item} (₹${responseData.data.price})`, 
           isBot: true 
@@ -108,9 +111,7 @@ const ChatBotPopup = () => {
       } else {
         throw new Error(responseData.error || 'Unknown server error');
       }
-
     } catch (error) {
-      console.error('Message handling error:', error);
       setError(error.message);
       setMessages(prev => [...prev, { 
         text: "Sorry, I'm having trouble processing your request.", 
@@ -140,7 +141,6 @@ const ChatBotPopup = () => {
 
     recognition.onresult = (event) => {
       const transcript = event.results[0][0].transcript;
-      console.log('Voice recognition result:', transcript);
       setInputText(transcript);
       setIsListening(false);
     };

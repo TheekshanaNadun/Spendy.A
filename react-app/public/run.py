@@ -2,27 +2,29 @@ import os
 from flask import Flask, request, jsonify, session
 import requests
 import pyodbc
+from datetime import timedelta
 from datetime import datetime
 from dotenv import load_dotenv
 from flask_cors import CORS
+from flask_session import Session
 
 app = Flask(__name__)
 
-# Configure session settings
 app.secret_key = os.getenv("FLASK_SECRET_KEY", os.urandom(24))
+# Session configuration
 app.config.update(
+    SESSION_TYPE='filesystem',
+    PERMANENT_SESSION_LIFETIME=timedelta(minutes=60),
     SESSION_COOKIE_SAMESITE='None',
     SESSION_COOKIE_SECURE=True,
-    SESSION_COOKIE_HTTPONLY=True,
-    PERMANENT_SESSION_LIFETIME=3600
+    SESSION_COOKIE_HTTPONLY=True
 )
 
-# Configure CORS
 CORS(app, 
     resources={
-        r"/process_message": {
+        r"/*": {  # Allow all routes
             "origins": "http://localhost:3000",
-            "methods": ["POST", "OPTIONS"],
+            "methods": ["POST", "OPTIONS", "GET"],
             "allow_headers": ["Content-Type", "Authorization"],
             "supports_credentials": True
         }
@@ -32,22 +34,55 @@ CORS(app,
 @app.after_request
 def add_cors_headers(response):
     response.headers["Access-Control-Allow-Origin"] = "http://localhost:3000"
-    response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+    response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS, GET"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
     response.headers["Access-Control-Allow-Credentials"] = "true"
     return response
 
-# Load environment variables
 load_dotenv()
 
-# Configure Kluster AI API
 KLUSTER_API_URL = "https://api.kluster.ai/v1/chat/completions"
 KLUSTER_API_KEY = os.getenv("KLUSTER_API_KEY")
 
-# Configure SQL Server connection
 server = os.getenv("SQL_SERVER")
 database = os.getenv("SQL_DATABASE")
 connection_string = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server};DATABASE={database};Trusted_Connection=yes"
+
+@app.route('/login', methods=['POST', 'OPTIONS'])
+def login():
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+    
+    try:
+        session.permanent = True
+        session['user_id'] = 1  # Mock user ID
+        print(f"Login successful. Session data: {dict(session)}")
+        return jsonify({
+            "status": "success",
+            "message": "Logged in successfully",
+            "user_id": session['user_id']
+        })
+    except Exception as e:
+        print(f"Login error: {str(e)}")
+        return jsonify({"error": "Login failed"}), 500
+
+# Add this debug route
+@app.route('/debug_session', methods=['GET'])
+def debug_session():
+    print(f"Current session data: {dict(session)}")
+    return jsonify({
+        "session_data": dict(session),
+        "has_user_id": 'user_id' in session
+    })
+
+# Add a session check route
+@app.route('/check_session', methods=['GET'])
+def check_session():
+    print("Current session:", dict(session))
+    return jsonify({
+        "authenticated": 'user_id' in session,
+        "user_id": session.get('user_id')
+    })
 
 def call_kluster_api(message):
     payload = {
@@ -184,7 +219,9 @@ def process_message():
         return jsonify({}), 200
         
     try:
+        print("Session data:", dict(session))
         if 'user_id' not in session:
+            print("No user_id in session")
             return jsonify({"error": "User not logged in"}), 401
 
         user_id = session['user_id']
