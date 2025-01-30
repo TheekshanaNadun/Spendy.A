@@ -88,7 +88,7 @@
 
 .chatArea {
   flex: 1 !important;
-  padding: 16px 26px !important;
+  padding: 26px 26px !important;
   overflow-y: auto !important;
   display: flex !important;
   flex-direction: column !important;
@@ -137,6 +137,7 @@
   border: 1px solid #e0e0e0 !important;
   border-radius: 8px !important;
   font-size: 14px !important;
+  color: #000 !important;
 }
 
 .voiceButton{

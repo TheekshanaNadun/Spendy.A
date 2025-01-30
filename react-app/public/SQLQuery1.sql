@@ -1,6 +1,9 @@
 use spendy_ai;
 
 select * from transactions;
+select * from users;
+
+
 DROP TABLE transactions;
 
 CREATE TABLE users (

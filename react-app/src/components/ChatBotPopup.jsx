@@ -125,7 +125,7 @@ const ChatBotPopup = () => {
 
       const response = await sendMessageToServer(message);
       setMessages(prev => [...prev, { 
-        text: `Added: ${response.data.item} (LKR${response.data.price})`,
+        text: `Added: ${response.data.item} : LKR  ${response.data.price}`,
         isBot: true 
       }]);
 

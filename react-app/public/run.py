@@ -90,7 +90,7 @@ def call_kluster_api(message):
     payload = {
         "model": "klusterai/Meta-Llama-3.1-8B-Instruct-Turbo",
         "messages": [
-            {"role": "system", "content": "Extract structured data from the message. Always include the following fields: item, category, date, location, price, and type(Income or Expense). Each data must not have spaces."},
+            {"role": "system", "content": "Extract structured data from the message. Always include the following fields: item, category(analyze), date(%b %d), location, price, and type(Income or Expense). Each data must not have spaces.Keep empty if not available."},
             {"role": "user", "content": message}
         ],
         "temperature": 0.2,
@@ -153,9 +153,9 @@ def parse_kluster_response(response):
                 except ValueError:
                     logger.warning(f"Invalid price format: {value}")
             elif "category" in key:
-                parsed_data["category"] = value
+                parsed_data["category"] = value.capitalize()
             elif "item" in key:
-                parsed_data["item"] = value
+                parsed_data["item"] = value.capitalize()
             elif "type" in key:
                 parsed_data["type"] = value.capitalize()
 
