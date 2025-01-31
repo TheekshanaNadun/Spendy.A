@@ -31,3 +31,26 @@ CREATE TABLE transactions (
     FOREIGN KEY (user_id) REFERENCES users(user_id)
 
 );
+CREATE TABLE categories (
+    category_id INT IDENTITY(1,1) PRIMARY KEY,
+    name VARCHAR(100) UNIQUE NOT NULL,
+    type VARCHAR(20) NOT NULL CHECK (type IN ('Income', 'Expense'))
+);
+CREATE TABLE user_category_limits (
+    limit_id INT IDENTITY(1,1) PRIMARY KEY,
+    user_id INT NOT NULL,
+    category_id INT NOT NULL,
+    monthly_limit DECIMAL(10,2) NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (category_id) REFERENCES categories(category_id) ON DELETE CASCADE,
+    UNIQUE (user_id, category_id)
+);
+CREATE TABLE notifications (
+    notification_id INT IDENTITY(1,1) PRIMARY KEY,
+    user_id INT NOT NULL,
+    type VARCHAR(50) NOT NULL,  -- 'threshold_alert', 'payment_reminder'
+    message TEXT NOT NULL,
+    is_read BIT DEFAULT 0,
+    created_at DATETIME DEFAULT GETDATE(),
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+);

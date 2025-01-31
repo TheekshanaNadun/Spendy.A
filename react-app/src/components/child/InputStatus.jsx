@@ -1,125 +1,144 @@
-import { Icon } from '@iconify/react/dist/iconify.js'
-import React from 'react'
+import { Icon } from '@iconify/react/dist/iconify.js';
+import React from 'react';
 
-const InputStatus = () => {
+const BudgetThresholdForm = () => {
     return (
         <div className="col-lg-12">
             <div className="card">
                 <div className="card-header">
-                    <h5 className="card-title mb-0">Input Status</h5>
+                    <h5 className="card-title mb-0">Budget Threshold Settings</h5>
                 </div>
                 <div className="card-body">
                     <form className="row gy-3 needs-validation" noValidate="">
+                        {/* Monthly Expense Limit */}
                         <div className="col-md-6">
-                            <label className="form-label">First Name</label>
+                            <label className="form-label">Monthly Expense Limit</label>
                             <div className="icon-field has-validation">
                                 <span className="icon">
-                                    <Icon icon="f7:person" />
+                                    <Icon icon="ph:currency-dollar-bold" />
                                 </span>
                                 <input
-                                    type="text"
-                                    name="#0"
+                                    type="number"
                                     className="form-control"
-                                    placeholder="Enter First Name"
-                                    required=""
-                                />
-                                <div className="invalid-feedback">Please provide first name</div>
-                            </div>
-                        </div>
-                        <div className="col-md-6">
-                            <label className="form-label">Last Name</label>
-                            <div className="icon-field has-validation">
-                                <span className="icon">
-                                    <Icon icon="f7:person" />
-                                </span>
-                                <input
-                                    type="text"
-                                    name="#0"
-                                    className="form-control"
-                                    placeholder="Enter Last Name"
-                                    required=""
-                                />
-                                <div className="invalid-feedback">Please provide last name</div>
-                            </div>
-                        </div>
-                        <div className="col-md-6">
-                            <label className="form-label">Email</label>
-                            <div className="icon-field has-validation">
-                                <span className="icon">
-                                    <Icon icon="mage:email" />
-                                </span>
-                                <input
-                                    type="email"
-                                    name="#0"
-                                    className="form-control"
-                                    placeholder="Enter Email"
-                                    required=""
+                                    placeholder="Monthly budget cap"
+                                    required
                                 />
                                 <div className="invalid-feedback">
-                                    Please provide email address
+                                    Required monthly limit
                                 </div>
                             </div>
                         </div>
+
+                        {/* Add New Category Threshold */}
                         <div className="col-md-6">
-                            <label className="form-label">Phone</label>
-                            <div className="icon-field has-validation">
-                                <span className="icon">
-                                    <Icon icon="solar:phone-calling-linear" />
-                                </span>
+                            <label className="form-label">Add New Threshold</label>
+                            <div className="input-group has-validation">
                                 <input
                                     type="text"
-                                    name="#0"
                                     className="form-control"
-                                    placeholder="+1 (555) 000-0000"
-                                    required=""
+                                    placeholder="Category name"
+                                    required
                                 />
-                                <div className="invalid-feedback">
-                                    Please provide phone number
-                                </div>
-                            </div>
-                        </div>
-                        <div className="col-md-6">
-                            <label className="form-label">Password</label>
-                            <div className="icon-field has-validation">
-                                <span className="icon">
-                                    <Icon icon="solar:lock-password-outline" />
-                                </span>
                                 <input
-                                    type="password"
-                                    name="#0"
+                                    type="number"
                                     className="form-control"
-                                    placeholder="*******"
-                                    required=""
+                                    placeholder="Limit value"
+                                    required
                                 />
-                                <div className="invalid-feedback">Please provide password</div>
+                                <button 
+                                    type="button" 
+                                    className="btn btn-primary-600"
+                                >
+                                    <Icon icon="ic:round-add" />
+                                </button>
                             </div>
                         </div>
-                        <div className="col-md-6">
-                            <label className="form-label">Confirm Password</label>
-                            <div className="icon-field has-validation">
-                                <span className="icon">
-                                    <Icon icon="solar:lock-password-outline" />
-                                </span>
-                                <input
-                                    type="password"
-                                    name="#0"
-                                    className="form-control"
-                                    placeholder="*******"
-                                    required=""
-                                />
-                                <div className="invalid-feedback">Please confirm password</div>
+
+                        {/* Threshold Display Table */}
+                        <div className="col-12">
+                            <div className="table-responsive">
+                                <table className="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th style={{width: '40px'}}></th>
+                                            <th>Expense Type</th>
+                                            <th>Limit</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>
+                                                <Icon 
+                                                    icon="fluent:food-24-regular" 
+                                                    className="text-primary" 
+                                                    width={24}
+                                                />
+                                            </td>
+                                            <td>Food</td>
+                                            <td>$500</td>
+                                            <td>
+                                                <button className="btn btn-sm btn-link">
+                                                    <Icon icon="mdi:pencil-outline" />
+                                                </button>
+                                                <button className="btn btn-sm btn-link text-danger">
+                                                    <Icon icon="mdi:trash-can-outline" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>
+                                                <Icon 
+                                                    icon="ic:round-directions-car" 
+                                                    className="text-success" 
+                                                    width={24}
+                                                />
+                                            </td>
+                                            <td>Transportation</td>
+                                            <td>$300</td>
+                                            <td>
+                                                <button className="btn btn-sm btn-link">
+                                                    <Icon icon="mdi:pencil-outline" />
+                                                </button>
+                                                <button className="btn btn-sm btn-link text-danger">
+                                                    <Icon icon="mdi:trash-can-outline" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>
+                                                <Icon 
+                                                    icon="mdi:file-document-outline" 
+                                                    className="text-warning" 
+                                                    width={24}
+                                                />
+                                            </td>
+                                            <td>Bills</td>
+                                            <td>$1200</td>
+                                            <td>
+                                                <button className="btn btn-sm btn-link">
+                                                    <Icon icon="mdi:pencil-outline" />
+                                                </button>
+                                                <button className="btn btn-sm btn-link text-danger">
+                                                    <Icon icon="mdi:trash-can-outline" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
-                        <div className="col-md-12">
+
+                        <div className="col-12">
                             <button className="btn btn-primary-600" type="submit">
-                                Submit form
+                                Save Configuration
                             </button>
                         </div>
                     </form>
                 </div>
             </div>
         </div>
-    )
-}
+    );
+};
 
-export default InputStatus
+export default BudgetThresholdForm;
