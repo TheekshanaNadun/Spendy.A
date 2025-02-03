@@ -3187,7 +3187,7 @@ th {
 }
 
 .bg-base {
-  background-color: var(--white) !important;
+  background-color: var(240, 255, 255) !important;
 }
 
 .bg-base-50 {
@@ -14149,9 +14149,12 @@ td.fc-header-center {
 }
 
 .auth-left {
-  background: linear-gradient(90deg, #ecf0ff 0%, #fafbff 100%);
+  background: linear-gradient(90deg, #eefcfd
+  0%, #eefcfd
+  100%);
   width: 50%;
 }
+
 
 .auth-right {
   width: 50%;
