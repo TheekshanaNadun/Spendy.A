@@ -332,7 +332,7 @@ def get_all_transactions():
             "item": t.item,
             "price": t.price,
             "date": t.date.isoformat(),
-            "timestamp": t.timestamp.isoformat() if t.timestamp else datetime.min.isoformat(),           
+            "timestamp": t.timestamp.isoformat() if t.timestamp else datetime.min.isoformat(),          
             "location": t.location,
             "category": t.category,
             "type": t.type,
@@ -341,6 +341,9 @@ def get_all_transactions():
         } for t in transactions.items]), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+
+    
 def transactions():
     user_id = session['user_id']
     
@@ -385,6 +388,9 @@ def transactions():
             "message": "Transaction added successfully"
         }), 201
 
+
+
+
 @app.route('/api/transactions/<int:transaction_id>', methods=['PUT', 'DELETE'])
 @require_login
 def manage_transaction(transaction_id):
@@ -398,16 +404,30 @@ def manage_transaction(transaction_id):
         
     if request.method == 'PUT':
         data = request.get_json()
-        for field in ['item', 'price', 'date', 'location', 'category', 'type']:
-            if field in data:
-                setattr(transaction, field, data[field])
-        db.session.commit()
-        return jsonify({"message": "Transaction updated"}), 200
+        
+        try:
+            # Handle date conversion
+            if 'date' in data:
+                transaction.date = datetime.strptime(data['date'], '%Y-%m-%d').date()
+            
+            # Update other fields
+            fields = ['item', 'price', 'location', 'category', 'type',
+                     'timestamp', 'latitude', 'longitude']
+            for field in fields:
+                if field in data:
+                    setattr(transaction, field, data[field])
+            
+            db.session.commit()
+            return jsonify({"message": "Transaction updated"}), 200
+            
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
         
     if request.method == 'DELETE':
         db.session.delete(transaction)
         db.session.commit()
         return jsonify({"message": "Transaction deleted"}), 200
+
 @app.after_request
 def handle_options(response):
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, PATCH, OPTIONS'
