@@ -14,10 +14,11 @@ app.secret_key = "d3bcef141597b4c00a9e4dccb893d1b3d3bcef141597b4c00a9e4dccb893d1
 # Configure Flask-Session
 app.config.update(
     SESSION_TYPE='filesystem',
+    SESSION_COOKIE_NAME='spendy_session',
     SESSION_PERMANENT=False,
     SESSION_USE_SIGNER=True,
     SESSION_COOKIE_SAMESITE='Lax',
-    SESSION_COOKIE_SECURE=False,  # Set to True in production with HTTPS
+    SESSION_COOKIE_SECURE=False,
     PERMANENT_SESSION_LIFETIME=timedelta(hours=1)
 )
 
@@ -29,17 +30,16 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 Session(app)
 
-# Configure CORS for React frontend
-CORS(app, resources={
-    r"/api/*": {
-         "origins": "http://localhost:3000",
+# Configure CORS
+CORS(app,
+    resources={r"/api/*": {
+        "origins": "http://localhost:3000",
         "supports_credentials": True,
-        "methods": ["GET", "POST", "PUT", "DELETE"],
-        "allow_headers": ["Content-Type", "Authorization"],
-        "expose_headers": ["Content-Range", "X-Content-Range"]
-    }
-})
-
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS","PATCH"],
+        "allow_headers": ["Content-Type", "Authorization", "Accept"],
+        "expose_headers": ["Content-Range"]
+    }}
+)
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 
@@ -52,6 +52,8 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     monthly_limit = db.Column(db.Integer, default=0)
     profile_image = db.Column(db.LargeBinary)
+    transactions = db.relationship('Transaction', backref='user', lazy=True)
+    category_limits = db.relationship('UserCategoryLimit', backref='user', lazy=True)
 
 class Transaction(db.Model):
     __tablename__ = 'transactions'
@@ -67,6 +69,24 @@ class Transaction(db.Model):
     latitude = db.Column(db.Float)
     longitude = db.Column(db.Float)
 
+class Category(db.Model):
+    __tablename__ = 'categories'
+    category_id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    type = db.Column(db.String(20), nullable=False)
+    
+class UserCategoryLimit(db.Model):
+    __tablename__ = 'user_category_limits'
+    limit_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
+    category_id = db.Column(db.Integer, db.ForeignKey('categories.category_id'), nullable=False)
+    monthly_limit = db.Column(db.Numeric(10, 2), nullable=False)
+    category = db.relationship('Category', backref='limits')
+
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'category_id', name='_user_category_uc'),
+    )
+
 # Create tables
 with app.app_context():
     db.create_all()
@@ -75,12 +95,11 @@ with app.app_context():
 def require_login(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'authenticated' not in session:
+        if 'user_id' not in session:  # Changed from 'authenticated'
             app.logger.warning("Unauthorized access attempt")
             return jsonify({"error": "Unauthorized access"}), 401
         return f(*args, **kwargs)
     return decorated_function
-
 # Routes
 @app.route('/api/signup', methods=['POST'])
 def signup():
@@ -99,16 +118,13 @@ def signup():
         if User.query.filter((User.username == username) | (User.email == email)).first():
             return jsonify({"error": "Username or email already exists"}), 409
 
-        # Hash the password before storing it in the database
         new_user = User(
             username=username,
             email=email,
-            password_hash=generate_password_hash(password)  # Hashing here
+            password_hash=generate_password_hash(password)
         )
         db.session.add(new_user)
         db.session.commit()
-        
-        app.logger.debug(f"User {username} created successfully.")
         
         return jsonify({"message": f"User {username} created successfully!"}), 201
 
@@ -120,37 +136,23 @@ def signup():
 @app.route('/api/login', methods=['POST'])
 def login():
     try:
-        # Parse JSON data from the request
         data = request.get_json()
-        email = data.get('email')  # Use 'email' instead of 'username'
+        email = data.get('email')
         password = data.get('password')
 
-        # Validate input
         if not all([email, password]):
-            app.logger.debug("Missing credentials in login request.")
             return jsonify({"error": "Missing email or password"}), 400
 
-        # Fetch user from the database by email
         user = User.query.filter_by(email=email).first()
 
-        if not user:
-            app.logger.debug(f"Login failed: User with email {email} not found.")
+        if not user or not check_password_hash(user.password_hash, password):
             return jsonify({"error": "Invalid email or password"}), 401
 
-        # Compare provided password with stored hash
-        if not check_password_hash(user.password_hash, password):
-            app.logger.debug(f"Login failed: Password mismatch for email {email}.")
-            return jsonify({"error": "Invalid email or password"}), 401
-
-        # Set session data for authenticated user
         session.clear()
         session['authenticated'] = True
         session['user_id'] = user.user_id
         session.permanent = True
 
-        app.logger.debug(f"User with email {email} logged in successfully.")
-
-        # Return success response with user details
         return jsonify({
             "message": "Login successful",
             "user": {
@@ -163,8 +165,7 @@ def login():
     except Exception as e:
         app.logger.error(f"Login error: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
-
-
+    
 
 @app.route('/api/logout', methods=['POST'])
 def logout():
@@ -186,23 +187,163 @@ def session_check():
             }), 200
     return jsonify({"authenticated": False}), 401
 
-# Transaction routes
-@app.route('/api/transactions', methods=['POST'])
+# User Routes
+@app.route('/api/user', methods=['GET'])
 @require_login
-def add_transaction():
+def user_settings():
     try:
+        user = User.query.get(session['user_id'])
+        return jsonify({
+            "user_id": user.user_id,
+            "monthly_limit": user.monthly_limit
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+# Category Routes
+@app.route('/api/categories', methods=['GET'])
+def get_categories():
+    categories = Category.query.all()
+    return jsonify([{
+        "category_id": c.category_id,
+        "name": c.name,
+        "type": c.type
+    } for c in categories]), 200
+@app.route('/api/user', methods=['PATCH'])
+@require_login
+def update_user_settings():
+    try:
+        user = User.query.get(session['user_id'])
         data = request.get_json()
-        required_fields = ['item', 'price', 'date']
-        if not all(field in data for field in required_fields):
-            return jsonify({"error": "Missing required fields"}), 400
+        
+        if 'monthly_limit' not in data:
+            return jsonify({"error": "Missing monthly_limit field"}), 400
+            
+        # Convert to integer and validate
+        try:
+            monthly_limit = int(data['monthly_limit'])
+            if monthly_limit < 0:
+                raise ValueError
+        except ValueError:
+            return jsonify({"error": "Invalid monthly limit value"}), 400
+            
+        user.monthly_limit = monthly_limit
+        db.session.commit()
+        
+        return jsonify({
+            "message": "Monthly limit updated",
+            "monthly_limit": user.monthly_limit
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Database error: {str(e)}")
+        return jsonify({"error": "Database update failed"}), 500
+    except Exception as e:
+        app.logger.error(f"Unexpected error: {str(e)}")
+        return jsonify({"error": "Server error"}), 500
 
+
+# Category Limit Routes
+@app.route('/api/user-limits', methods=['GET', 'POST'])
+@require_login
+def user_limits():
+    user_id = session['user_id']
+    
+    try:
+        if request.method == 'GET':
+            limits = db.session.query(
+                UserCategoryLimit,
+                Category.name
+            ).join(Category).filter(
+                UserCategoryLimit.user_id == user_id
+            ).all()
+            
+            return jsonify([{
+                "limit_id": limit.UserCategoryLimit.limit_id,
+                "category_id": limit.UserCategoryLimit.category_id,
+                "monthly_limit": float(limit.UserCategoryLimit.monthly_limit),
+                "category_name": limit.name
+            } for limit in limits]), 200
+            
+        if request.method == 'POST':
+            data = request.get_json()
+            # Validate category exists
+            if not Category.query.get(data['category_id']):
+                return jsonify({"error": "Invalid category ID"}), 400
+                
+            # Use upsert pattern
+            limit = UserCategoryLimit.query.filter_by(
+                user_id=user_id,
+                category_id=data['category_id']
+            ).first()
+            
+            if limit:
+                limit.monthly_limit = data['monthly_limit']
+            else:
+                limit = UserCategoryLimit(
+                    user_id=user_id,
+                    category_id=data['category_id'],
+                    monthly_limit=data['monthly_limit']
+                )
+                db.session.add(limit)
+            
+            db.session.commit()
+            return jsonify({
+                "limit_id": limit.limit_id,
+                "category_id": limit.category_id,
+                "monthly_limit": float(limit.monthly_limit)
+            }), 200
+            
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"User limits error: {str(e)}")
+        return jsonify({"error": "Server error processing limits"}), 500
+
+@app.route('/api/user-limits/<int:limit_id>', methods=['DELETE'])
+@require_login
+def delete_limit(limit_id):
+    limit = UserCategoryLimit.query.filter_by(
+        limit_id=limit_id,
+        user_id=session['user_id']
+    ).first()
+    
+    if not limit:
+        return jsonify({"error": "Limit not found"}), 404
+        
+    db.session.delete(limit)
+    db.session.commit()
+    return jsonify({"message": "Limit deleted"}), 200
+
+# Transaction Routes
+@app.route('/api/transactions', methods=['GET', 'POST'])
+@require_login
+def transactions():
+    user_id = session['user_id']
+    
+    if request.method == 'GET':
+        transactions = Transaction.query.filter_by(user_id=user_id).all()
+        return jsonify([{
+            "transaction_id": t.transaction_id,
+            "item": t.item,
+            "price": t.price,
+            "date": t.date.isoformat(),
+            "location": t.location,
+            "category": t.category,
+            "type": t.type,
+            "timestamp": str(t.timestamp) if t.timestamp else None,
+            "latitude": t.latitude,
+            "longitude": t.longitude
+        } for t in transactions]), 200
+        
+    if request.method == 'POST':
+        data = request.get_json()
         try:
             transaction_date = datetime.strptime(data['date'], '%Y-%m-%d').date()
         except ValueError:
-            return jsonify({"error": "Invalid date format. Use YYYY-MM-DD"}), 400
-
+            return jsonify({"error": "Invalid date format"}), 400
+            
         new_transaction = Transaction(
-            user_id=session['user_id'],
+            user_id=user_id,
             item=data['item'],
             price=data['price'],
             date=transaction_date,
@@ -215,55 +356,54 @@ def add_transaction():
         )
         db.session.add(new_transaction)
         db.session.commit()
-        return jsonify({"message": "Transaction added successfully"}), 201
+        return jsonify({
+            "transaction_id": new_transaction.transaction_id,
+            "message": "Transaction added successfully"
+        }), 201
 
-    except Exception as e:
-        db.session.rollback()
-        app.logger.error(f"Transaction creation error: {str(e)}")
-        return jsonify({"error": "Failed to create transaction"}), 500
-
-@app.route('/api/transactions', methods=['GET'])
+@app.route('/api/transactions/<int:transaction_id>', methods=['PUT', 'DELETE'])
 @require_login
-def get_transactions():
-    try:
-        transactions = Transaction.query.filter_by(user_id=session['user_id']).all()
-        return jsonify([{
-            "transaction_id": t.transaction_id,
-            "item": t.item,
-            "price": t.price,
-            "date": t.date.isoformat(),
-            "location": t.location,
-            "category": t.category,
-            "type": t.type,
-            "timestamp": t.timestamp.isoformat() if t.timestamp else None,
-            "latitude": t.latitude,
-            "longitude": t.longitude
-        } for t in transactions]), 200
-
-    except Exception as e:
-        app.logger.error(f"Transactions fetch error: {str(e)}")
-        return jsonify({"error": "Failed to fetch transactions"}), 500
-
-@app.route('/api/transactions/<int:transaction_id>', methods=['DELETE'])
-@require_login
-def delete_transaction(transaction_id):
-    try:
-        transaction = Transaction.query.filter_by(
-            transaction_id=transaction_id,
-            user_id=session['user_id']
-        ).first()
-
-        if not transaction:
-            return jsonify({"error": "Transaction not found"}), 404
-
+def manage_transaction(transaction_id):
+    transaction = Transaction.query.filter_by(
+        transaction_id=transaction_id,
+        user_id=session['user_id']
+    ).first()
+    
+    if not transaction:
+        return jsonify({"error": "Transaction not found"}), 404
+        
+    if request.method == 'PUT':
+        data = request.get_json()
+        for field in ['item', 'price', 'date', 'location', 'category', 'type']:
+            if field in data:
+                setattr(transaction, field, data[field])
+        db.session.commit()
+        return jsonify({"message": "Transaction updated"}), 200
+        
+    if request.method == 'DELETE':
         db.session.delete(transaction)
         db.session.commit()
-        return jsonify({"message": "Transaction deleted successfully"}), 200
+        return jsonify({"message": "Transaction deleted"}), 200
+@app.after_request
+def handle_options(response):
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, PATCH, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    return response
+def convert_to_json(response):
+    if response.content_type == 'text/html':
+        try:
+            error_data = {
+                "error": "Unexpected HTML response",
+                "status": response.status_code,
+                "message": response.get_data(as_text=True)[:100]
+            }
+            response = jsonify(error_data)
+            response.status_code = 500
+        except Exception as e:
+            app.logger.error(f"JSON conversion failed: {str(e)}")
+    return response
 
-    except Exception as e:
-        db.session.rollback()
-        app.logger.error(f"Transaction deletion error: {str(e)}")
-        return jsonify({"error": "Failed to delete transaction"}), 500
+
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
