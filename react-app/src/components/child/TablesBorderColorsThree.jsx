@@ -1,156 +1,155 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react';
+import { Icon } from '@iconify/react';
 
-const TablesBorderColorsThree = () => {
+const TransactionTable = () => {
+    const [transactions, setTransactions] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [page, setPage] = useState(1);
+
+    useEffect(() => {
+        const fetchTransactions = async () => {
+            try {
+                const response = await fetch(`http://localhost:5000/api/transactions?page=${page}`, {
+                    credentials: 'include'
+                });
+                
+                if (!response.ok) throw new Error('Failed to fetch transactions');
+                
+                const data = await response.json();
+                setTransactions(data);
+            } catch (error) {
+                console.error('Error:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchTransactions();
+    }, [page]);
+
+    const formatCurrency = (amount) => {
+        return new Intl.NumberFormat('en-LK', {
+            style: 'currency',
+            currency: 'LKR',
+            minimumFractionDigits: 2
+        }).format(amount);
+    };
+
+    const formatTime = (timeString) => {
+        if (!timeString) return 'N/A';
+        const [hours, minutes] = timeString.split(':');
+        const hour = parseInt(hours, 10);
+        return `${hour % 12 || 12}:${minutes} ${hour >= 12 ? 'PM' : 'AM'}`;
+    };
+
     return (
         <div className="col-lg-12">
-            <div className="card">
-                <div className="card-header">
-                    <h5 className="card-title mb-0">Tables Border Colors</h5>
+            <div className="card shadow-sm" style={{ borderColor: 'var(--border-color)' }}>
+                <div className="card-header d-flex justify-content-between align-items-center py-3 border-bottom">
+                    <h5 className="card-title mb-0 text-secondary-light">Transaction History</h5>
+                    <div className="d-flex align-items-center gap-2">
+                        <button 
+                            className="btn btn-sm btn-light px-3 py-1 rounded-pill border"
+                            onClick={() => setPage(p => Math.max(1, p - 1))}
+                            disabled={page === 1}
+                        >
+                            <Icon icon="mdi:chevron-left" width="20" />
+                        </button>
+                        <span className="text-muted small">Page {page}</span>
+                        <button 
+                            className="btn btn-sm btn-light px-3 py-1 rounded-pill border"
+                            onClick={() => setPage(p => p + 1)}
+                        >
+                            <Icon icon="mdi:chevron-right" width="20" />
+                        </button>
+                    </div>
                 </div>
-                <div className="card-body">
+
+                <div className="card-body p-0">
                     <div className="table-responsive">
                         <table className="table bordered-table mb-0">
-                            <thead>
+                            <thead className="bg-light">
                                 <tr>
-                                    <th scope="col">Users</th>
-                                    <th scope="col">Invoice</th>
-                                    <th scope="col">Items</th>
-                                    <th scope="col">Qty</th>
-                                    <th scope="col">Amount</th>
-                                    <th scope="col" className="text-center">
-                                        Status
-                                    </th>
+                                    <th scope="col" className="text-secondary-light">ID</th>
+                                    <th scope="col" className="text-secondary-light">Item</th>
+                                    <th scope="col" className="text-secondary-light">Category</th>
+                                    <th scope="col" className="text-secondary-light">Type</th>
+                                    <th scope="col" className="text-secondary-light">Date</th>
+                                    <th scope="col" className="text-secondary-light">Time</th>
+                                    <th scope="col" className="text-secondary-light text-end">Amount</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr>
-                                    <td>
-                                        <div className="d-flex align-items-center">
-                                            <img
-                                                src="assets/images/users/user1.png"
-                                                alt=""
-                                                className="flex-shrink-0 me-12 radius-8"
-                                            />
-                                            <span className="text-lg text-secondary-light fw-semibold flex-grow-1">
-                                                Dianne Russell
+                                {transactions.map((transaction) => (
+                                    <tr key={transaction.transaction_id}>
+                                        <td className="font-monospace text-secondary-light">
+                                            #{transaction.transaction_id.toString().slice(0, 6)}
+                                        </td>
+                                        <td>
+                                            <div className="d-flex align-items-center gap-2">
+                                                <Icon
+                                                    icon={getCategoryIcon(transaction.category)}
+                                                    className="flex-shrink-0 me-12 text-primary"
+                                                    width="24"
+                                                />
+                                                <span className="text-secondary-light fw-semibold">
+                                                    {transaction.item}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span className="badge bg-dark text-light rounded-pill px-24 py-4">
+                                                {transaction.category}
                                             </span>
-                                        </div>
-                                    </td>
-                                    <td>#6352148</td>
-                                    <td>iPhone 14 max</td>
-                                    <td>2</td>
-                                    <td>$5,000.00</td>
-                                    <td className="text-center">
-                                        {" "}
-                                        <span className="bg-success-focus text-success-main px-24 py-4 rounded-pill fw-medium text-sm">
-                                            Paid
-                                        </span>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        <div className="d-flex align-items-center">
-                                            <img
-                                                src="assets/images/users/user2.png"
-                                                alt=""
-                                                className="flex-shrink-0 me-12 radius-8"
-                                            />
-                                            <span className="text-lg text-secondary-light fw-semibold flex-grow-1">
-                                                Wade Warren
+                                        </td>
+                                        <td>
+                                            <span className={`badge ${transaction.type === 'Income' 
+                                                ? 'bg-success-focus text-success-main' 
+                                                : 'bg-danger-focus text-danger-main'} rounded-pill px-24 py-4`}>
+                                                {transaction.type}
                                             </span>
-                                        </div>
-                                    </td>
-                                    <td>#6352148</td>
-                                    <td>Laptop HPH </td>
-                                    <td>3</td>
-                                    <td>$1,000.00</td>
-                                    <td className="text-center">
-                                        {" "}
-                                        <span className="bg-warning-focus text-warning-main px-24 py-4 rounded-pill fw-medium text-sm">
-                                            Pending
-                                        </span>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        <div className="d-flex align-items-center">
-                                            <img
-                                                src="assets/images/users/user3.png"
-                                                alt=""
-                                                className="flex-shrink-0 me-12 radius-8"
-                                            />
-                                            <span className="text-lg text-secondary-light fw-semibold flex-grow-1">
-                                                Albert Flores
+                                        </td>
+                                        <td className="text-secondary-light">
+                                            {new Date(transaction.date).toLocaleDateString('en-GB', {
+                                                day: '2-digit',
+                                                month: 'short'
+                                            })}
+                                        </td>
+                                        <td className="text-secondary-light">
+                                            {formatTime(transaction.timestamp)}
+                                        </td>
+                                        <td className="text-end">
+                                            <span className={
+                                                `font-monospace ${
+                                                    transaction.type === 'Income' 
+                                                    ? 'text-success-main' 
+                                                    : 'text-danger-main'
+                                                }`
+                                            }>
+                                                {formatCurrency(transaction.price)}
                                             </span>
-                                        </div>
-                                    </td>
-                                    <td>#6352148</td>
-                                    <td>Smart Watch </td>
-                                    <td>7</td>
-                                    <td>$1,000.00</td>
-                                    <td className="text-center">
-                                        {" "}
-                                        <span className="bg-info-focus text-info-main px-24 py-4 rounded-pill fw-medium text-sm">
-                                            Shipped
-                                        </span>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        <div className="d-flex align-items-center">
-                                            <img
-                                                src="assets/images/users/user4.png"
-                                                alt=""
-                                                className="flex-shrink-0 me-12 radius-8"
-                                            />
-                                            <span className="text-lg text-secondary-light fw-semibold flex-grow-1">
-                                                Bessie Cooper
-                                            </span>
-                                        </div>
-                                    </td>
-                                    <td>#6352148</td>
-                                    <td>Nike Air Shoe</td>
-                                    <td>1</td>
-                                    <td>$3,000.00</td>
-                                    <td className="text-center">
-                                        {" "}
-                                        <span className="bg-danger-focus text-danger-main px-24 py-4 rounded-pill fw-medium text-sm">
-                                            Canceled
-                                        </span>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        <div className="d-flex align-items-center">
-                                            <img
-                                                src="assets/images/users/user5.png"
-                                                alt=""
-                                                className="flex-shrink-0 me-12 radius-8"
-                                            />
-                                            <span className="text-lg text-secondary-light fw-semibold flex-grow-1">
-                                                Arlene McCoy
-                                            </span>
-                                        </div>
-                                    </td>
-                                    <td>#6352148</td>
-                                    <td>New Headphone </td>
-                                    <td>5</td>
-                                    <td>$4,000.00</td>
-                                    <td className="text-center">
-                                        {" "}
-                                        <span className="bg-danger-focus text-danger-main px-24 py-4 rounded-pill fw-medium text-sm">
-                                            Canceled
-                                        </span>
-                                    </td>
-                                </tr>
+                                        </td>
+                                    </tr>
+                                ))}
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
-            {/* card end */}
         </div>
-    )
-}
+    );
+};
 
-export default TablesBorderColorsThree
+const getCategoryIcon = (category) => {
+    const icons = {
+        'Food': 'mdi:food-drumstick',
+        'Transport': 'mdi:car-electric',
+        'Bills': 'mdi:receipt',
+        'Shopping': 'mdi:tag',
+        'Healthcare': 'mdi:heart-pulse',
+        'Education': 'mdi:book-open',
+        'Income': 'mdi:currency-usd-circle'
+    };
+    return icons[category] || 'mdi:wallet';
+};
+
+export default TransactionTable;

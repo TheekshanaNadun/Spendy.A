@@ -317,6 +317,30 @@ def delete_limit(limit_id):
 # Transaction Routes
 @app.route('/api/transactions', methods=['GET', 'POST'])
 @require_login
+def get_all_transactions():
+    try:
+        user_id = session['user_id']
+        page = request.args.get('page', 1, type=int)
+        per_page = 10
+
+        transactions = Transaction.query.filter_by(user_id=user_id)\
+            .order_by(Transaction.date.desc(), Transaction.timestamp.desc())\
+            .paginate(page=page, per_page=per_page)
+
+        return jsonify([{
+            "transaction_id": t.transaction_id,
+            "item": t.item,
+            "price": t.price,
+            "date": t.date.isoformat(),
+            "timestamp": t.timestamp.isoformat() if t.timestamp else datetime.min.isoformat(),           
+            "location": t.location,
+            "category": t.category,
+            "type": t.type,
+            "latitude": t.latitude,
+            "longitude": t.longitude
+        } for t in transactions.items]), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 def transactions():
     user_id = session['user_id']
     
@@ -403,6 +427,54 @@ def convert_to_json(response):
             app.logger.error(f"JSON conversion failed: {str(e)}")
     return response
 
+@app.route('/api/transactions/expense', methods=['GET'])
+def get_expense_transactions():
+    try:
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        transactions = Transaction.query.filter_by(
+            user_id=user_id,
+            type='Expense'
+        ).order_by(Transaction.date.desc()).all()
+
+        return jsonify([{
+            "transaction_id": t.transaction_id,
+            "date": t.date.isoformat(),
+            "item": t.item,
+            "category": t.category,
+            "location": t.location,
+            "price": t.price,
+            "timestamp": t.timestamp.isoformat() if t.timestamp else None
+        } for t in transactions]), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+@app.route('/api/transactions/income', methods=['GET'])
+@require_login
+def get_income_transactions():
+    try:
+        user_id = session['user_id']
+        transactions = Transaction.query.filter_by(
+            user_id=user_id,
+            type='Income'
+        ).order_by(Transaction.date.desc()).all()
+        
+        return jsonify([{
+            'transaction_id': t.transaction_id,
+            'date': t.date.isoformat(),
+            'item': t.item,
+            'category': t.category,
+            'location': t.location,
+            'price': t.price,
+            'timestamp': t.timestamp.isoformat() if t.timestamp else None
+        } for t in transactions]), 200
+        
+    except Exception as e:
+        app.logger.error(f'Error in get_income_transactions: {str(e)}')
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == "__main__":
