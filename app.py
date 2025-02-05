@@ -1,24 +1,37 @@
-from flask import Flask, session, jsonify, request
+from flask import Flask,session , jsonify, request
 from flask_session import Session
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from datetime import timedelta, datetime
-import logging
+import hashlib
+import random
 from sqlalchemy import extract, func, ForeignKey
 from sqlalchemy.exc import SQLAlchemyError
+import os
+import time
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # Initialize Flask app
 app = Flask(__name__)
 app.secret_key = "d3bcef141597b4c00a9e4dccb893d1b3d3bcef141597b4c00a9e4dccb893d1b3"
+OTP_EXPIRY = 300  # 5 minutes
 
+
+
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"]
+)
 # Configure Flask-Session
 app.config.update(
-    SESSION_TYPE='filesystem',
     SESSION_COOKIE_NAME='spendy_session',
-    SESSION_PERMANENT=False,
-    SESSION_USE_SIGNER=True,
+    SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
     SESSION_COOKIE_SECURE=False,
     PERMANENT_SESSION_LIFETIME=timedelta(hours=1)
@@ -34,7 +47,6 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
 
 # Initialize extensions
 db = SQLAlchemy(app)
-Session(app)
 
 # Configure CORS
 CORS(app, 
@@ -149,6 +161,53 @@ def signup():
         app.logger.error(f"Signup error: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
 
+
+
+
+
+
+# Add to config.py
+SECRET_KEY = os.environ.get('SECRET_KEY', 'your-very-secure-secret-key')
+OTP_EXPIRY = 300  # 5 minutes
+
+# Modified login route
+def send_otp_email(recipient_email, otp):
+    try:
+        msg = Message(
+            'Your SpendyAI Verification Code',
+            sender=app.config['MAIL_USERNAME'],
+            recipients=[recipient_email]
+        )
+        msg.body = f'Your verification code is: {otp}'
+        mail.send(msg)
+        return True
+    except Exception as e:
+        app.logger.error(f"Failed to send email to {recipient_email}: {str(e)}")
+        return False
+
+
+
+
+
+# Add after app initialization
+from flask_mail import Mail, Message
+
+app.config.update(
+    MAIL_SERVER='smtp.gmail.com',
+    MAIL_PORT=587,
+    MAIL_USE_TLS=True,
+    MAIL_USERNAME='tikka1030@gmail.com',
+    MAIL_PASSWORD='ubdo tcls esbn qeuu',
+    MAIL_DEFAULT_SENDER='tikka1030@gmail.com'
+)
+
+mail = Mail(app)
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["200 per hour", "50 per minute"]
+)
+# Modified login route
 @app.route('/api/login', methods=['POST'])
 def login():
     try:
@@ -156,52 +215,160 @@ def login():
         email = data.get('email')
         password = data.get('password')
 
-        if not all([email, password]):
-            return jsonify({"error": "Missing email or password"}), 400
-
         user = User.query.filter_by(email=email).first()
-
         if not user or not check_password_hash(user.password_hash, password):
-            return jsonify({"error": "Invalid email or password"}), 401
+            return jsonify({"error": "Invalid credentials"}), 401
 
-        session.clear()
-        session['authenticated'] = True
-        session['user_id'] = user.user_id
-        session.permanent = True
+        # Generate OTP and hash
+        otp = str(random.SystemRandom().randint(100000, 999999))
+        expires = int(time.time()) + OTP_EXPIRY
+        data_str = f"{email}.{otp}.{expires}"
+        otp_hash = hashlib.sha256(f"{data_str}{SECRET_KEY}".encode()).hexdigest()
+        
+        # Send OTP via email
+        try:
+            send_otp_email(email, otp)
+        except Exception as e:
+            return jsonify({"error": "Failed to send OTP email"}), 503
 
         return jsonify({
-            "message": "Login successful",
+            "message": "OTP sent to email",
+            "otpRequired": True,
+            "otpHash": f"{otp_hash}.{expires}",
+            "email": email
+        }), 200
+
+    except Exception as e:
+        app.logger.error(f"Login error: {str(e)}")
+        return jsonify({"error": "Internal server error"}), 500
+
+# Modified resend OTP route
+@app.route('/api/resend-otp', methods=['POST'])
+@limiter.limit("3/minute")
+def resend_otp():
+    try:
+        data = request.get_json()
+        email = data['email']
+        
+        # Verify user exists
+        user = User.query.filter_by(email=email).first()
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        # Generate new OTP and hash
+        otp = str(random.SystemRandom().randint(100000, 999999))
+        expires = int(time.time()) + OTP_EXPIRY
+        data_str = f"{email}.{otp}.{expires}"
+        otp_hash = hashlib.sha256(f"{data_str}{SECRET_KEY}".encode()).hexdigest()
+
+        # Resend OTP via email
+        try:
+            send_otp_email(email, otp)
+        except Exception as e:
+            return jsonify({"error": "Failed to resend OTP email"}), 503
+
+        return jsonify({
+            "message": "New OTP sent",
+            "otpHash": f"{otp_hash}.{expires}"
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+def send_otp_email(recipient_email, otp):
+    try:
+        msg = Message(
+            subject='Your SpendyAI Verification Code',
+            recipients=[recipient_email],
+            body=f'Your verification code is: {otp}'
+        )
+        mail.send(msg)
+        return True
+    except Exception as e:
+        app.logger.error(f"Failed to send email to {recipient_email}: {str(e)}")
+        return False
+    
+from flask import abort
+
+@app.route('/api/verify-otp', methods=['POST'])
+@limiter.limit("5/minute")
+def verify_otp():
+    try:
+        data = request.get_json()
+        email = data['email']
+        user_otp = data['otp']
+        received_hash = data['otpHash']
+
+        # Validate hash structure
+        if '.' not in received_hash:
+            return jsonify({"error": "Invalid OTP format"}), 400
+            
+        hash_part, expires = received_hash.split('.', 1)
+        
+        # Check expiration
+        if int(expires) < time.time():
+            return jsonify({"error": "OTP expired"}), 401
+
+        # Recreate verification hash
+        data_str = f"{email}.{user_otp}.{expires}"
+        expected_hash = hashlib.sha256(f"{data_str}{SECRET_KEY}".encode()).hexdigest()
+
+        # Validate OTP hash
+        if expected_hash != hash_part:
+            return jsonify({"error": "Invalid OTP"}), 401
+
+        user = User.query.filter_by(email=email).first()
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        # Only set session after successful validation
+        session.permanent = True
+        session['user_id'] = user.user_id
+        session['email'] = user.email
+        session['logged_in'] = True
+
+        return jsonify({
+            "success": True,
+            "user": {
+                "user_id": user.user_id,
+                "email": email
+            }
+        }), 200
+
+    except Exception as e:
+        app.logger.error(f"OTP verification failed: {str(e)}")
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@app.route('/api/session-check', methods=['GET'])
+@limiter.limit("100/hour")
+def session_check():
+    if 'user_id' in session and session.get('logged_in'):
+        user = User.query.get(session['user_id'])
+        return jsonify({
+            "authenticated": True,
             "user": {
                 "user_id": user.user_id,
                 "username": user.username,
                 "email": user.email
             }
         }), 200
+    return jsonify({"authenticated": False}), 401
 
-    except Exception as e:
-        app.logger.error(f"Login error: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
-    
 
-@app.route('/api/logout', methods=['POST'])
+
+
+
+
+#@app.route('/api/logout')
 def logout():
     session.clear()
-    return jsonify({"message": "Logged out successfully"}), 200
+    return jsonify({
+        "success": True,
+        "redirect": "/"
+    }), 200
 
-@app.route('/api/session-check', methods=['GET'])
-def session_check():
-    if 'authenticated' in session:
-        user = User.query.get(session['user_id'])
-        if user:
-            return jsonify({
-                "authenticated": True,
-                "user": {
-                    "user_id": user.user_id,
-                    "username": user.username,
-                    "email": user.email
-                }
-            }), 200
-    return jsonify({"authenticated": False}), 401
+
 
 # User Routes
 @app.route('/api/user', methods=['GET'])

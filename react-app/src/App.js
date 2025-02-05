@@ -1,5 +1,5 @@
-import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
-import { useEffect, useState, createContext, useContext } from "react";
+import { BrowserRouter, Route, Routes, Navigate,useNavigate } from "react-router-dom";
+import { useEffect, useState, createContext, useContext ,} from "react";
 import axios from "axios";
 
 // Page imports
@@ -39,8 +39,17 @@ export const AuthContext = createContext(null);
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useContext(AuthContext);
-  if (loading) return <div>Loading...</div>;
-  return isAuthenticated ? children : <Navigate to="/sign-in" />;
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      navigate("/sign-in");
+    }
+  }, [isAuthenticated, loading, navigate]);
+
+  if (loading) return <div className="full-page-loader">Loading...</div>;
+  
+  return isAuthenticated ? children : null;
 };
 
 function App() {
@@ -48,29 +57,44 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
 
+  const checkAuthStatus = async () => {
+    try {
+      const response = await axios.get("http://localhost:5000/api/session-check");
+      setIsAuthenticated(response.data.authenticated);
+      if (response.data.authenticated) {
+        setUser(response.data.user);
+      } else {
+        setUser(null);
+      }
+    } catch (error) {
+      setIsAuthenticated(false);
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     axios.defaults.withCredentials = true;
-    const checkAuthStatus = async () => {
-      try {
-        const response = await axios.get("http://localhost:5000/api/session-check");
-        setIsAuthenticated(response.data.authenticated);
-        response.data.authenticated && setUser(response.data.user);
-      } catch (error) {
-        console.error("Session check failed:", error.response?.data);
-        setIsAuthenticated(false);
-        setUser(null);
-      } finally {
-        setLoading(false);
-      }
+    
+    const initializeAuth = async () => {
+      await checkAuthStatus();
+      const interval = setInterval(checkAuthStatus, 300000); // 5 minute checks
+      return () => clearInterval(interval);
     };
 
-    checkAuthStatus();
-    const interval = setInterval(checkAuthStatus, 300000);
-    return () => clearInterval(interval);
+    initializeAuth();
   }, []);
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, setIsAuthenticated, loading, user, setUser }}>
+    <AuthContext.Provider value={{ 
+      isAuthenticated, 
+      setIsAuthenticated, 
+      loading, 
+      user, 
+      setUser,
+      checkAuthStatus
+    }}>
       <BrowserRouter>
         <RouteScrollToTop />
         <Routes>
