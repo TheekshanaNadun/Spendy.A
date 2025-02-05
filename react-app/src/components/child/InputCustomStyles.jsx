@@ -1,5 +1,5 @@
 import { Icon } from '@iconify/react/dist/iconify.js';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 
@@ -9,16 +9,33 @@ const TransactionForm = () => {
     const [formData, setFormData] = useState({
         item: '',
         price: '',
-        date: '',
+        date: new Date().toISOString().split('T')[0],
         category: '',
-        type: '',
+        type: 'Expense',
         timestamp: '',
         location: '',
         latitude: null,
         longitude: null
     });
 
+    const [categories, setCategories] = useState([]);
     const [geolocationError, setGeolocationError] = useState('');
+
+    // Fetch categories from backend
+    useEffect(() => {
+        const fetchCategories = async () => {
+            try {
+                const response = await fetch('http://localhost:5000/api/categories', {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                setCategories(data);
+            } catch (error) {
+                console.error('Error fetching categories:', error);
+            }
+        };
+        fetchCategories();
+    }, []);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -28,26 +45,39 @@ const TransactionForm = () => {
         }));
     };
 
+    const handleCategoryChange = (e) => {
+        const [category, type] = e.target.value.split('|');
+        setFormData(prev => ({
+            ...prev,
+            category,
+            type
+        }));
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         
         try {
-            // Convert price to integer (whole number)
-            const priceValue = Math.round(parseFloat(formData.price));
-            
+            if (!formData.category || !formData.type) {
+                throw new Error('Please select a valid category');
+            }
+
+            const priceValue = parseFloat(formData.price);
             if (isNaN(priceValue) || priceValue <= 0) {
                 throw new Error('Please enter a valid positive number for price');
             }
 
-            // Get geolocation
+            // Convert price to decimal format for backend processing
+            const formattedPrice = priceValue.toFixed(2);
+
+            // Geolocation handling with fallback
             let coords = { latitude: null, longitude: null };
             try {
                 const position = await new Promise((resolve, reject) => {
-                    navigator.geolocation.getCurrentPosition(
-                        resolve, 
-                        reject, 
-                        { enableHighAccuracy: true, timeout: 5000 }
-                    );
+                    navigator.geolocation.getCurrentPosition(resolve, reject, {
+                        enableHighAccuracy: true,
+                        timeout: 5000
+                    });
                 });
                 coords = {
                     latitude: position.coords.latitude,
@@ -55,26 +85,40 @@ const TransactionForm = () => {
                 };
                 setGeolocationError('');
             } catch (error) {
-                setGeolocationError('Location services disabled - using default coordinates');
+                console.warn('Geolocation error:', error);
+                setGeolocationError('Location services disabled - coordinates not recorded');
             }
 
-            const transactionData = {
-                ...formData,
-                price: priceValue,  // Send as whole number
-                ...coords
+            // Prepare payload with proper data types
+            const payload = {
+                item: formData.item,
+                price: formData.price,  // Keep as string "999.00"
+                date: formData.date,
+                category: formData.category,
+                type: formData.type,
+                location: formData.location,
+                timestamp: formData.timestamp || null,
+                latitude: coords.latitude,
+                longitude: coords.longitude
             };
 
             const response = await fetch('http://localhost:5000/api/transactions', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(transactionData),
-                credentials: 'include'
+                headers: { 
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'include',
+                body: JSON.stringify(payload)
             });
 
-            const data = await response.json();
+            const responseData = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.error || 'Transaction failed');
+                // Handle category conflicts specifically
+                if (response.status === 409) {
+                    throw new Error(responseData.error || 'Category conflict detected');
+                }
+                throw new Error(responseData.error || 'Transaction failed');
             }
 
             MySwal.fire({
@@ -85,17 +129,15 @@ const TransactionForm = () => {
                 timer: 2000
             });
 
-            setFormData({
+            // Reset form while maintaining category/type selection
+            setFormData(prev => ({
+                ...prev,
                 item: '',
                 price: '',
-                date: '',
-                category: '',
-                type: '',
-                timestamp: '',
                 location: '',
                 latitude: null,
                 longitude: null
-            });
+            }));
 
         } catch (error) {
             MySwal.fire({
@@ -160,41 +202,26 @@ const TransactionForm = () => {
                         </div>
 
                         {/* Category Field */}
-                        <div className="col-md-4">
+                        <div className="col-md-6">
                             <label className="form-label">Category</label>
                             <select 
                                 className="form-select" 
                                 name="category"
-                                value={formData.category}
-                                onChange={handleChange}
+                                value={`${formData.category}|${formData.type}`}
+                                onChange={handleCategoryChange}
                                 required
                             >
                                 <option value="">Select Category</option>
-                                <option value="Food">Food</option>
-                                <option value="Bills">Bills</option>
-                                <option value="Income">Income</option>
-                                <option value="Transportation">Transportation</option>
-                            </select>
-                        </div>
-
-                        {/* Type Field */}
-                        <div className="col-md-4">
-                            <label className="form-label">Type</label>
-                            <select 
-                                className="form-select" 
-                                name="type"
-                                value={formData.type}
-                                onChange={handleChange}
-                                required
-                            >
-                                <option value="">Select Type</option>
-                                <option value="Income">Income</option>
-                                <option value="Expense">Expense</option>
+                                {categories.map(cat => (
+                                    <option key={cat.category_id} value={`${cat.name}|${cat.type}`}>
+                                        {cat.name} ({cat.type})
+                                    </option>
+                                ))}
                             </select>
                         </div>
 
                         {/* Time Field */}
-                        <div className="col-md-4">
+                        <div className="col-md-6">
                             <label className="form-label">Time</label>
                             <input
                                 type="time"
@@ -226,7 +253,7 @@ const TransactionForm = () => {
                             </div>
                         )}
 
-                        {/* Submit Button with Proper Icon Alignment */}
+                        {/* Submit Button */}
                         <div className="col-12 mt-4">
                             <button 
                                 className="btn btn-primary-600 d-flex align-items-center justify-content-center gap-2" 

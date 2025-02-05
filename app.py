@@ -6,6 +6,8 @@ from functools import wraps
 from flask_cors import CORS
 from datetime import timedelta, datetime
 import logging
+from sqlalchemy import extract, func, ForeignKey
+from sqlalchemy.exc import SQLAlchemyError
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -24,24 +26,24 @@ app.config.update(
 
 # Configure SQL Server connection
 app.config['SQLALCHEMY_DATABASE_URI'] = "mssql+pyodbc://@MSI\\SQLEXPRESS/spendy_ai?driver=ODBC+Driver+17+for+SQL+Server&Trusted_Connection=yes"
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# In your database configuration
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'implicit_returning': False,
+    'execution_options': {'isolation_level': 'READ COMMITTED'}
+}
 
 # Initialize extensions
 db = SQLAlchemy(app)
 Session(app)
 
 # Configure CORS
-CORS(app,
-    resources={r"/api/*": {
-        "origins": "http://localhost:3000",
-        "supports_credentials": True,
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS","PATCH"],
-        "allow_headers": ["Content-Type", "Authorization", "Accept"],
-        "expose_headers": ["Content-Range"]
-    }}
-)
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
+CORS(app, 
+     resources={r"/api/*": {
+         "origins": "http://localhost:3000",
+         "supports_credentials": True,
+         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+         "allow_headers": ["Content-Type", "Authorization"]
+     }})
 
 # Database Models
 class User(db.Model):
@@ -52,22 +54,30 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     monthly_limit = db.Column(db.Integer, default=0)
     profile_image = db.Column(db.LargeBinary)
-    transactions = db.relationship('Transaction', backref='user', lazy=True)
-    category_limits = db.relationship('UserCategoryLimit', backref='user', lazy=True)
+    
+    transactions = db.relationship('Transaction', back_populates='user')
+    category_limits = db.relationship('UserCategoryLimit', back_populates='user')
 
 class Transaction(db.Model):
     __tablename__ = 'transactions'
     transaction_id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
+    user_id = db.Column(db.Integer, ForeignKey('users.user_id'), nullable=False)
+    category = db.Column(db.String(100), ForeignKey('categories.name'))
+    type = db.Column(db.String(50), nullable=False)
     item = db.Column(db.String(255))
     price = db.Column(db.Integer)
-    date = db.Column(db.Date, nullable=False)
+    date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
     location = db.Column(db.String(255))
-    category = db.Column(db.String(100))
-    type = db.Column(db.String(50))
     timestamp = db.Column(db.Time)
     latitude = db.Column(db.Float)
     longitude = db.Column(db.Float)
+    
+    user = db.relationship('User', back_populates='transactions')
+    category_rel = db.relationship('Category', back_populates='transactions')
+__table_args__ = {
+        'implicit_returning': False  # Set per-table in __table_args__
+    }
+
 
 class Category(db.Model):
     __tablename__ = 'categories'
@@ -75,31 +85,37 @@ class Category(db.Model):
     name = db.Column(db.String(100), unique=True, nullable=False)
     type = db.Column(db.String(20), nullable=False)
     
+    transactions = db.relationship('Transaction', back_populates='category_rel')
+    limits = db.relationship('UserCategoryLimit', back_populates='category')
+    
+    __table_args__ = (
+        db.CheckConstraint("type IN ('Income', 'Expense')", name='check_category_type'),
+    )
+
 class UserCategoryLimit(db.Model):
     __tablename__ = 'user_category_limits'
     limit_id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
-    category_id = db.Column(db.Integer, db.ForeignKey('categories.category_id'), nullable=False)
+    user_id = db.Column(db.Integer, ForeignKey('users.user_id'), nullable=False)
+    category_id = db.Column(db.Integer, ForeignKey('categories.category_id'), nullable=False)
     monthly_limit = db.Column(db.Numeric(10, 2), nullable=False)
-    category = db.relationship('Category', backref='limits')
-
+    
+    user = db.relationship('User', back_populates='category_limits')
+    category = db.relationship('Category', back_populates='limits')
+    
     __table_args__ = (
         db.UniqueConstraint('user_id', 'category_id', name='_user_category_uc'),
     )
 
-# Create tables
-with app.app_context():
-    db.create_all()
-
-# Authentication decorator
 def require_login(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'user_id' not in session:  # Changed from 'authenticated'
-            app.logger.warning("Unauthorized access attempt")
-            return jsonify({"error": "Unauthorized access"}), 401
+        if 'user_id' not in session:
+            return jsonify({"error": "Unauthorized"}), 401
         return f(*args, **kwargs)
     return decorated_function
+
+
+
 # Routes
 @app.route('/api/signup', methods=['POST'])
 def signup():
@@ -201,13 +217,18 @@ def user_settings():
         return jsonify({"error": str(e)}), 500
 # Category Routes
 @app.route('/api/categories', methods=['GET'])
+@require_login
 def get_categories():
-    categories = Category.query.all()
-    return jsonify([{
-        "category_id": c.category_id,
-        "name": c.name,
-        "type": c.type
-    } for c in categories]), 200
+    try:
+        categories = Category.query.all()
+        return jsonify([{
+            'category_id': c.category_id,
+            'name': c.name,
+            'type': c.type
+        } for c in categories]), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/user', methods=['PATCH'])
 @require_login
 def update_user_settings():
@@ -315,7 +336,7 @@ def delete_limit(limit_id):
     return jsonify({"message": "Limit deleted"}), 200
 
 # Transaction Routes
-@app.route('/api/transactions', methods=['GET', 'POST'])
+@app.route('/api/transactions', methods=['GET'])
 @require_login
 def get_all_transactions():
     try:
@@ -343,51 +364,75 @@ def get_all_transactions():
         return jsonify({"error": str(e)}), 500
     
 
-    
-def transactions():
-    user_id = session['user_id']
-    
-    if request.method == 'GET':
-        transactions = Transaction.query.filter_by(user_id=user_id).all()
-        return jsonify([{
-            "transaction_id": t.transaction_id,
-            "item": t.item,
-            "price": t.price,
-            "date": t.date.isoformat(),
-            "location": t.location,
-            "category": t.category,
-            "type": t.type,
-            "timestamp": str(t.timestamp) if t.timestamp else None,
-            "latitude": t.latitude,
-            "longitude": t.longitude
-        } for t in transactions]), 200
-        
-    if request.method == 'POST':
+
+from sqlalchemy import text
+
+@app.route('/api/transactions', methods=['POST'])
+@require_login
+def create_transaction():
+    try:
         data = request.get_json()
-        try:
-            transaction_date = datetime.strptime(data['date'], '%Y-%m-%d').date()
-        except ValueError:
-            return jsonify({"error": "Invalid date format"}), 400
-            
-        new_transaction = Transaction(
-            user_id=user_id,
-            item=data['item'],
-            price=data['price'],
-            date=transaction_date,
-            location=data.get('location'),
-            category=data.get('category'),
-            type=data.get('type'),
-            timestamp=data.get('timestamp'),
-            latitude=data.get('latitude'),
-            longitude=data.get('longitude')
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        # Validate required fields
+        required_fields = ['item', 'price', 'date', 'category', 'type']
+        if not all(field in data for field in required_fields):
+            return jsonify({"error": "Missing required fields"}), 400
+
+        # Check if category exists
+        category = Category.query.filter_by(name=data['category']).first()
+        if not category:
+            category = Category(
+                name=data['category'],
+                type=data['type']
+            )
+            db.session.add(category)
+            db.session.flush()
+
+        # First, execute the INSERT
+        insert_stmt = text("""
+            INSERT INTO transactions 
+            (user_id, category, type, item, price, date, location, timestamp, latitude, longitude)
+            VALUES 
+            (:user_id, :category, :type, :item, :price, :date, :location, :timestamp, :latitude, :longitude)
+        """)
+
+        db.session.execute(
+            insert_stmt,
+            {
+                'user_id': session['user_id'],
+                'category': data['category'],
+                'type': data['type'],
+                'item': data['item'],
+                'price': int(data['price']),
+                'date': datetime.strptime(data['date'], '%Y-%m-%d').date(),
+                'location': data.get('location'),
+                'timestamp': datetime.now().time(),
+                'latitude': data.get('latitude'),
+                'longitude': data.get('longitude')
+            }
         )
-        db.session.add(new_transaction)
+
+        # Then get the last inserted ID
+        result = db.session.execute(text("SELECT IDENT_CURRENT('transactions') AS transaction_id"))
+        transaction_id = result.scalar()
+        
         db.session.commit()
+
         return jsonify({
-            "transaction_id": new_transaction.transaction_id,
-            "message": "Transaction added successfully"
+            "message": "Transaction created successfully",
+            "transaction_id": int(transaction_id)
         }), 201
 
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        app.logger.error(f'Database error: {str(e)}')
+        return jsonify({"error": "Database operation failed"}), 500
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f'Unexpected error: {str(e)}')
+        return jsonify({"error": "Server error"}), 500
 
 
 
@@ -448,16 +493,14 @@ def convert_to_json(response):
     return response
 
 @app.route('/api/transactions/expense', methods=['GET'])
+@require_login
 def get_expense_transactions():
     try:
-        user_id = session.get('user_id')
-        if not user_id:
-            return jsonify({"error": "Unauthorized"}), 401
-
+        user_id = session['user_id']
         transactions = Transaction.query.filter_by(
             user_id=user_id,
             type='Expense'
-        ).order_by(Transaction.date.desc()).all()
+        ).options(db.joinedload(Transaction.category_rel)).order_by(Transaction.date.desc()).all()
 
         return jsonify([{
             "transaction_id": t.transaction_id,
@@ -466,12 +509,17 @@ def get_expense_transactions():
             "category": t.category,
             "location": t.location,
             "price": t.price,
-            "timestamp": t.timestamp.isoformat() if t.timestamp else None
+            "timestamp": t.timestamp.isoformat() if t.timestamp else None,
+            "coordinates": {"lat": t.latitude, "lng": t.longitude} if t.latitude and t.longitude else None
         } for t in transactions]), 200
 
+    except SQLAlchemyError as e:
+        app.logger.error(f'Database error: {str(e)}')
+        return jsonify({"error": "Database operation failed"}), 500
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    
+        app.logger.error(f'Unexpected error: {str(e)}')
+        return jsonify({"error": "Server error"}), 500
+
 @app.route('/api/transactions/income', methods=['GET'])
 @require_login
 def get_income_transactions():
@@ -480,21 +528,107 @@ def get_income_transactions():
         transactions = Transaction.query.filter_by(
             user_id=user_id,
             type='Income'
-        ).order_by(Transaction.date.desc()).all()
-        
+        ).options(db.joinedload(Transaction.category_rel)).order_by(Transaction.date.desc()).all()
+
         return jsonify([{
-            'transaction_id': t.transaction_id,
-            'date': t.date.isoformat(),
-            'item': t.item,
-            'category': t.category,
-            'location': t.location,
-            'price': t.price,
-            'timestamp': t.timestamp.isoformat() if t.timestamp else None
+            "transaction_id": t.transaction_id,
+            "date": t.date.isoformat(),
+            "item": t.item,
+            "category": t.category,
+            "location": t.location,
+            "price": t.price,
+            "timestamp": t.timestamp.isoformat() if t.timestamp else None,
+            "coordinates": {"lat": t.latitude, "lng": t.longitude} if t.latitude and t.longitude else None
         } for t in transactions]), 200
-        
+
+    except SQLAlchemyError as e:
+        app.logger.error(f'Database error: {str(e)}')
+        return jsonify({"error": "Database operation failed"}), 500
     except Exception as e:
-        app.logger.error(f'Error in get_income_transactions: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f'Unexpected error: {str(e)}')
+        return jsonify({"error": "Server error"}), 500
+
+
+
+@app.route('/api/stats', methods=['GET'])
+@require_login
+def get_financial_stats():
+    try:
+        user_id = session['user_id']
+        current_date = datetime.now()
+        
+        # Calculate date ranges
+        current_month_start = current_date.replace(day=1)
+        last_month_end = current_month_start - timedelta(days=1)
+        last_month_start = last_month_end.replace(day=1)
+
+        # Income calculations
+        current_month_income = db.session.query(
+            func.coalesce(func.sum(Transaction.price), 0)
+        ).filter(
+            Transaction.user_id == user_id,
+            Transaction.type == 'Income',
+            extract('year', Transaction.date) == current_date.year,
+            extract('month', Transaction.date) == current_date.month
+        ).scalar()
+
+        last_month_income = db.session.query(
+            func.coalesce(func.sum(Transaction.price), 0)
+        ).filter(
+            Transaction.user_id == user_id,
+            Transaction.type == 'Income',
+            extract('year', Transaction.date) == last_month_start.year,
+            extract('month', Transaction.date) == last_month_start.month
+        ).scalar()
+
+        # Expense calculations
+        current_month_expense = db.session.query(
+            func.coalesce(func.sum(Transaction.price), 0)
+        ).filter(
+            Transaction.user_id == user_id,
+            Transaction.type == 'Expense',
+            extract('year', Transaction.date) == current_date.year,
+            extract('month', Transaction.date) == current_date.month
+        ).scalar()
+
+        last_month_expense = db.session.query(
+            func.coalesce(func.sum(Transaction.price), 0)
+        ).filter(
+            Transaction.user_id == user_id,
+            Transaction.type == 'Expense',
+            extract('year', Transaction.date) == last_month_start.year,
+            extract('month', Transaction.date) == last_month_start.month
+        ).scalar()
+
+        # Net profit calculation
+        net_profit = current_month_income - current_month_expense
+
+        # Total savings (assuming savings is cumulative)
+        total_savings = db.session.query(
+            func.coalesce(func.sum(Transaction.price), 0)
+        ).filter(
+            Transaction.user_id == user_id,
+            Transaction.type == 'Income'
+        ).scalar() - db.session.query(
+            func.coalesce(func.sum(Transaction.price), 0)
+        ).filter(
+            Transaction.user_id == user_id,
+            Transaction.type == 'Expense'
+        ).scalar()
+
+        return jsonify({
+            'currentMonthIncome': current_month_income,
+            'lastMonthIncome': last_month_income,
+            'currentMonthExpense': current_month_expense,
+            'lastMonthExpense': last_month_expense,
+            'netProfit': net_profit,
+            'totalSavings': total_savings
+        }), 200
+
+    except Exception as e:
+        app.logger.error(f"Error fetching stats: {str(e)}")
+        return jsonify({"error": "Error retrieving statistics"}), 500
+
 
 
 if __name__ == "__main__":

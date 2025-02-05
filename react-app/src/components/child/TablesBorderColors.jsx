@@ -58,7 +58,7 @@ const TablesBorderColors = () => {
         <div className="col-lg-6">
             <div className="card">
                 <div className="card-header">
-                    <h5 className="card-title mb-0">Transaction History</h5>
+                    <h5 className="card-title mb-0">Income History</h5>
                 </div>
                 <div className="card-body">
                     {loading ? (

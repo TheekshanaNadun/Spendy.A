@@ -7,31 +7,88 @@ const TransactionTable = () => {
     const [transactions, setTransactions] = useState([]);
     const [selectedTransaction, setSelectedTransaction] = useState(null);
     const [showEditModal, setShowEditModal] = useState(false);
-    const [page, setPage] = useState(1);
+    const [loading, setLoading] = useState(true);
+    const [pagination, setPagination] = useState({
+        currentPage: 1,
+        totalPages: 1,
+        hasNext: false,
+        hasPrev: false,
+        total: 0,
+        perPage: 10
+    });
 
     useEffect(() => {
-    const fetchTransactions = async () => {
-        try {
-            const response = await fetch(`http://localhost:5000/api/transactions?page=${page}`, {
-                credentials: 'include'
-            });
-            const data = await response.json();
-            
-            // Destroy existing DataTable instance first
-            if ($.fn.DataTable.isDataTable('#transactionTable')) {
-                $('#transactionTable').DataTable().destroy();
+        const fetchTransactions = async () => {
+            try {
+                setLoading(true);
+                const response = await fetch(`http://localhost:5000/api/transactions?page=${pagination.currentPage}`, {
+                    credentials: 'include'
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if ($.fn.DataTable.isDataTable('#transactionTable')) {
+                    $('#transactionTable').DataTable().destroy();
+                }
+
+                setTransactions(data);
+                
+                $('#transactionTable').DataTable({
+                    paging: false,
+                    searching: true,
+                    info: false
+                });
+
+            } catch (error) {
+                console.error('Error:', error);
+            } finally {
+                setLoading(false);
             }
+        };
+        fetchTransactions();
+    }, [pagination.currentPage]);
 
-            setTransactions(data);
+    const [categories, setCategories] = useState([]);
 
-            
-        } catch (error) {
-            console.error('Error:', error);
+    useEffect(() => {
+        const fetchCategories = async () => {
+            try {
+                const response = await fetch('http://localhost:5000/api/categories', {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                setCategories(data);
+            } catch (error) {
+                console.error('Error fetching categories:', error);
+            }
+        };
+        fetchCategories();
+    }, []);
+
+
+    const handlePageChange = (newPage) => {
+        if (newPage >= 1 && newPage <= pagination.totalPages) {
+            setPagination(prev => ({ ...prev, currentPage: newPage }));
         }
     };
-    fetchTransactions();
-}, [page]);
 
+ 
+    const getCategoryIcon = (category) => {
+        const icons = {
+            'Food': 'mdi:food',
+            'Transport': 'mdi:car',
+            'Bills': 'mdi:file-document',
+            'Shopping': 'mdi:shopping',
+            'Healthcare': 'mdi:medical-bag',
+            'Education': 'mdi:school',
+            'Income': 'mdi:cash-plus'
+        };
+        return icons[category] || 'mdi:help-circle';
+    };
     
     const handleUpdate = async (updatedData) => {
         try {
@@ -47,8 +104,8 @@ const TransactionTable = () => {
     
             if (!response.ok) throw new Error('Update failed');
             
-            // Refresh data after update
-            const newData = await fetch(`http://localhost:5000/api/transactions?page=${page}`, {
+            // Use pagination.currentPage from existing state
+            const newData = await fetch(`http://localhost:5000/api/transactions?page=${pagination.currentPage}`, {
                 credentials: 'include'
             }).then(res => res.json());
             
@@ -60,22 +117,84 @@ const TransactionTable = () => {
             alert('Failed to update transaction');
         }
     };
+    
     const handleDelete = async (id) => {
         if (window.confirm('Are you sure you want to delete this transaction?')) {
             try {
-                await fetch(`http://localhost:5000/api/transactions/${id}`, {
+                const response = await fetch(`http://localhost:5000/api/transactions/${id}`, {
                     method: 'DELETE',
                     credentials: 'include'
                 });
-                window.location.reload();
+                
+                if (response.ok) {
+                    // Use pagination.currentPage from existing state
+                    const newData = await fetch(`http://localhost:5000/api/transactions?page=${pagination.currentPage}`, {
+                        credentials: 'include'
+                    }).then(res => res.json());
+                    
+                    setTransactions(newData);
+                }
             } catch (error) {
                 console.error('Delete error:', error);
             }
         }
     };
-
+    
+    
+    
+    
     return (
         <div style={{ padding: '20px' }}>
+            <div style={{ 
+                borderRadius: '8px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                border: '1px solid var(--border-color, #E5E7EB)'
+            }}>
+                <div style={{
+                    padding: '1rem',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    borderBottom: '1px solid var(--border-color, #E5E7EB)'
+                }}>
+                    <h5 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '600' }}>
+                        Transaction History
+                    </h5>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <span>
+                            Showing {((pagination.currentPage - 1) * pagination.perPage) + 1} to {Math.min(pagination.currentPage * pagination.perPage, pagination.total)} of {pagination.total} entries
+                        </span>
+                        <button
+                            onClick={() => handlePageChange(pagination.currentPage - 1)}
+                            disabled={!pagination.hasPrev}
+                            style={{
+                                padding: '0.5rem 1rem',
+                                borderRadius: '4px',
+                                border: '1px solid var(--border-color, #E5E7EB)',
+                                backgroundColor: pagination.hasPrev ? 'white' : '#f3f4f6',
+                                cursor: pagination.hasPrev ? 'pointer' : 'not-allowed'
+                            }}
+                        >
+                            Previous
+                        </button>
+                        <span>Page {pagination.currentPage} of {pagination.totalPages}</span>
+                        <button
+                            onClick={() => handlePageChange(pagination.currentPage + 1)}
+                            disabled={!pagination.hasNext}
+                            style={{
+                                padding: '0.5rem 1rem',
+                                borderRadius: '4px',
+                                border: '1px solid var(--border-color, #E5E7EB)',
+                                backgroundColor: pagination.hasNext ? 'white' : '#f3f4f6',
+                                cursor: pagination.hasNext ? 'pointer' : 'not-allowed'
+                            }}
+                        >
+                            Next
+                        </button>
+                    </div>
+                </div>
+
+                <div style={{ padding: '20px' }}>
             <div style={{ 
                 borderRadius: '8px',
                 boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
@@ -344,47 +463,37 @@ const TransactionTable = () => {
                         </div>
 
                         <div style={{ marginBottom: '1rem' }}>
-                            <label style={{ display: 'block', marginBottom: '0.5rem' }}>Category:</label>
-                            <select
-                                name="category"
-                                defaultValue={selectedTransaction?.category}
-                                style={{
-                                    width: '100%',
-                                    padding: '0.5rem',
-                                    border: '1px solid black',
-                                    borderRadius: '4px'
-                                }}
-                            >
-                                <option value="Food">🍔 Food</option>
-                                <option value="Transport">🚗 Transport</option>
-                                <option value="Bills">📑 Bills</option>
-                                <option value="Shopping">🛍️ Shopping</option>
-                                <option value="Healthcare">🏥 Healthcare</option>
-                                <option value="Education">📚 Education</option>
-                                <option value="Personal care">💅 Personal Care</option>
-                                <option value="Electronics">💻 Electronics</option>
-                            </select>
-                        </div>
+    <label style={{ display: 'block', marginBottom: '0.5rem' }}>Category:</label>
+    <select
+        name="category"
+        value={`${selectedTransaction?.category}|${selectedTransaction?.type}`}
+        onChange={(e) => {
+            const [category, type] = e.target.value.split('|');
+            handleUpdate({
+                ...selectedTransaction,
+                category,
+                type
+            });
+        }}
+        style={{
+            width: '100%',
+            padding: '0.5rem',
+            border: '1px solid black',
+            borderRadius: '4px'
+        }}
+    >
+        <option value="">Select Category</option>
+        {categories.map(cat => (
+            <option key={cat.category_id} value={`${cat.name}|${cat.type}`}>
+                {cat.name} ({cat.type})
+            </option>
+        ))}
+    </select>
+</div>
                     </div>
                 </div>
 
-                <div style={{ marginBottom: '1rem' }}>
-                    <label style={{ display: 'block', marginBottom: '0.5rem' }}>Type:</label>
-                    <select
-                        name="type"
-                        defaultValue={selectedTransaction?.type}
-                        style={{
-                            width: '100%',
-                            padding: '0.5rem',
-                            border: '1px solid black',
-
-                            borderRadius: '4px'
-                        }}
-                    >
-                        <option value="Income">Income</option>
-                        <option value="Expense">Expense</option>
-                    </select>
-                </div>
+             
 
                 <input 
                     type="hidden" 
@@ -438,23 +547,12 @@ const TransactionTable = () => {
         </div>
     </div>
 )}
+ </div>
 
 
+            </div>
         </div>
     );
-};
-
-const getCategoryIcon = (category) => {
-    const icons = {
-        'Food': 'mdi:food',
-        'Transport': 'mdi:car',
-        'Bills': 'mdi:file-document',
-        'Shopping': 'mdi:shopping',
-        'Healthcare': 'mdi:medical-bag',
-        'Education': 'mdi:school',
-        'Income': 'mdi:cash-plus'
-    };
-    return icons[category] || 'mdi:help-circle';
 };
 
 export default TransactionTable;
