@@ -34,8 +34,7 @@ const SignInLayer = () => {
           timer: 1500,
           showConfirmButton: false
         });
-        navigate("/dashboard?showWelcome=true");
-      } else {
+        window.location.href = "http://localhost:3000/dashboard?showWelcome=true";      } else {
         // Handle backend validation failure
         Swal.fire({
           icon: "error",

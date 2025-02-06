@@ -103,3 +103,131 @@ VALUES
 (1, 54, 0.00),       -- Foreign Remittances (income)
 (1, 47, 15000.00),   -- Petrol/Diesel
 (1, 38, 5000.00);    -- Internet (ADSL/Fiber)
+
+ALTER TABLE transactions
+ALTER COLUMN category VARCHAR(100) NOT NULL;
+
+ALTER TABLE transactions
+ADD CONSTRAINT FK_transactions_categories 
+FOREIGN KEY (category) REFERENCES categories(name);
+
+SELECT DISTINCT t.category 
+FROM transactions t
+LEFT JOIN categories c ON t.category = c.name
+WHERE c.category_id IS NULL;
+
+ALTER TABLE transactions
+ADD CONSTRAINT FK_transactions_categories 
+FOREIGN KEY (category) REFERENCES categories(name);
+
+ALTER TABLE transactions
+ADD CONSTRAINT CHK_type CHECK (type IN ('Income', 'Expense'));
+
+CREATE TRIGGER trg_SyncCategories
+ON transactions
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Insert new categories from transactions
+    INSERT INTO categories (name, type)
+    SELECT DISTINCT i.category, i.type
+    FROM inserted i
+    LEFT JOIN categories c ON i.category = c.name
+    WHERE c.category_id IS NULL
+      AND i.category IS NOT NULL
+      AND i.type IN ('Income', 'Expense');
+END;
+
+CREATE TRIGGER trg_ValidateCategoryType
+ON transactions
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Check for type mismatches
+    IF EXISTS (
+        SELECT 1
+        FROM inserted i
+        JOIN categories c ON i.category = c.name
+        WHERE c.type <> i.type
+    )
+    BEGIN
+        RAISERROR('Category type mismatch: Transaction type conflicts with existing category.', 16, 1);
+        ROLLBACK TRANSACTION;
+        RETURN;
+    END
+END;
+SELECT transaction_id, category_id 
+FROM transactions 
+WHERE category_id NOT IN (SELECT category_id FROM categories);
+
+- Backfill missing categories from existing transactions
+INSERT INTO categories (name, type)
+SELECT DISTINCT category, type 
+FROM transactions
+WHERE category IS NOT NULL
+  AND type IN ('Income', 'Expense')
+  AND category NOT IN (SELECT name FROM categories);
+
+  -- Allow NULL temporarily during transition
+ALTER TABLE transactions
+ALTER COLUMN category VARCHAR(100) NULL;
+
+-- Add foreign key constraint
+ALTER TABLE transactions
+ADD CONSTRAINT FK_transactions_categories 
+FOREIGN KEY (category) REFERENCES categories(name);
+
+-- Enforce NOT NULL after validation
+ALTER TABLE transactions
+ALTER COLUMN category VARCHAR(100) NOT NULL;
+
+
+ALTER TRIGGER
+trg_SyncCategories ON transactions
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- Handle new categories
+    MERGE INTO categories AS target
+    USING (SELECT DISTINCT category, type FROM inserted) AS source
+    ON target.name = source.category
+    WHEN NOT MATCHED THEN
+        INSERT (name, type) VALUES (source.category, source.type);
+END;
+
+ALTER TRIGGER trg_ValidateCategoryType
+ON transactions
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    IF EXISTS (
+        SELECT 1
+        FROM inserted i
+        LEFT JOIN categories c ON i.category = c.name
+        WHERE c.type <> i.type
+    )
+    BEGIN
+        ;THROW 51000, 'Category type mismatch with transaction', 1;
+        ROLLBACK TRANSACTION;
+    END
+END;
+
+SELECT name, is_not_trusted 
+FROM sys.foreign_keys 
+WHERE name = 'FK_transactions_categories';
+
+INSERT INTO transactions (user_id, item, price, date, category, type)
+SELECT 1, 'Test Item', 5000, GETDATE(), c.name, 'Expense'
+FROM categories c
+WHERE c.name = 'NewCategory' AND c.type = 'Expense';
+
+-- Disable trigger temporarily for testing
+DISABLE TRIGGER trg_SyncCategories ON transactions;

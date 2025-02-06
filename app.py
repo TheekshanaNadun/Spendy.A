@@ -1,4 +1,4 @@
-from flask import Flask,session , jsonify, request
+from flask import Flask,session , jsonify, request,redirect
 from flask_session import Session
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -327,8 +327,11 @@ def verify_otp():
         session['email'] = user.email
         session['logged_in'] = True
 
+        # Redirect to dashboard with welcome parameter
+        redirect_url = 'http://localhost:3000/dashboard?showWelcome=true'
         return jsonify({
             "success": True,
+            "redirect": redirect_url,
             "user": {
                 "user_id": user.user_id,
                 "email": email
@@ -338,6 +341,7 @@ def verify_otp():
     except Exception as e:
         app.logger.error(f"OTP verification failed: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
+
 
 
 @app.route('/api/session-check', methods=['GET'])
@@ -360,13 +364,10 @@ def session_check():
 
 
 
-#@app.route('/api/logout')
+@app.route('/api/logout')
 def logout():
     session.clear()
-    return jsonify({
-        "success": True,
-        "redirect": "/"
-    }), 200
+    return redirect('http://localhost:3000/', code=302)
 
 
 
