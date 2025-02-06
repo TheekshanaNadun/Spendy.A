@@ -6,9 +6,21 @@ from dotenv import load_dotenv
 from flask_cors import CORS
 import os
 import logging
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import text
+from datetime import datetime
+from sqlalchemy import extract, func, ForeignKey
+from flask_sqlalchemy import SQLAlchemy
+
 
 app = Flask(__name__)
-
+# Configure SQL Server connection
+app.config['SQLALCHEMY_DATABASE_URI'] = "mssql+pyodbc://@MSI\\SQLEXPRESS/spendy_ai?driver=ODBC+Driver+17+for+SQL+Server&Trusted_Connection=yes"
+# In your database configuration
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'implicit_returning': False,
+    'execution_options': {'isolation_level': 'READ COMMITTED'}
+}
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -26,6 +38,68 @@ CORS(app,
         }
     }
 )
+db = SQLAlchemy(app)
+# Database Models
+class User(db.Model):
+    __tablename__ = 'users'
+    user_id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(255), unique=True, nullable=False)
+    email = db.Column(db.String(255), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    monthly_limit = db.Column(db.Integer, default=0)
+    profile_image = db.Column(db.LargeBinary)
+    
+    transactions = db.relationship('Transaction', back_populates='user')
+    category_limits = db.relationship('UserCategoryLimit', back_populates='user')
+
+class Transaction(db.Model):
+    __tablename__ = 'transactions'
+    transaction_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, ForeignKey('users.user_id'), nullable=False)
+    category = db.Column(db.String(100), ForeignKey('categories.name'))
+    type = db.Column(db.String(50), nullable=False)
+    item = db.Column(db.String(255))
+    price = db.Column(db.Integer)
+    date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
+    location = db.Column(db.String(255))
+    timestamp = db.Column(db.Time)
+    latitude = db.Column(db.Float)
+    longitude = db.Column(db.Float)
+    
+    user = db.relationship('User', back_populates='transactions')
+    category_rel = db.relationship('Category', back_populates='transactions')
+__table_args__ = {
+        'implicit_returning': False  # Set per-table in __table_args__
+    }
+
+
+class Category(db.Model):
+    __tablename__ = 'categories'
+    category_id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    type = db.Column(db.String(20), nullable=False)
+    
+    transactions = db.relationship('Transaction', back_populates='category_rel')
+    limits = db.relationship('UserCategoryLimit', back_populates='category')
+    
+    __table_args__ = (
+        db.CheckConstraint("type IN ('Income', 'Expense')", name='check_category_type'),
+    )
+
+class UserCategoryLimit(db.Model):
+    __tablename__ = 'user_category_limits'
+    limit_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, ForeignKey('users.user_id'), nullable=False)
+    category_id = db.Column(db.Integer, ForeignKey('categories.category_id'), nullable=False)
+    monthly_limit = db.Column(db.Numeric(10, 2), nullable=False)
+    
+    user = db.relationship('User', back_populates='category_limits')
+    category = db.relationship('Category', back_populates='limits')
+    
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'category_id', name='_user_category_uc'),
+    )
+
 
 @app.after_request
 def add_cors_headers(response):
@@ -165,37 +239,132 @@ def parse_kluster_response(response):
         logger.error(f"Error parsing Kluster response: {e}")
         return None
 
+
+
 def store_in_database(data):
     try:
-        conn = pyodbc.connect(connection_string)
-        cursor = conn.cursor()
-        
-        query = """
+        # Validate required fields
+        required_fields = ['user_id', 'item', 'price', 'date', 'category', 'type']
+        if not all(field in data for field in required_fields):
+            raise ValueError("Missing required fields")
+
+        # Check if category exists
+        category = Category.query.filter_by(name=data['category']).first()
+        if not category:
+            category = Category(
+                name=data['category'],
+                type=data['type']
+            )
+            db.session.add(category)
+            db.session.flush()
+
+        # Insert transaction using text query
+        insert_stmt = text("""
             INSERT INTO transactions 
-            (user_id, item, price, date, category, location, type, timestamp, latitude, longitude)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """
+            (user_id, category, type, item, price, date, location, timestamp, latitude, longitude)
+            VALUES 
+            (:user_id, :category, :type, :item, :price, :date, :location, :timestamp, :latitude, :longitude)
+        """)
+
+        db.session.execute(
+            insert_stmt,
+            {
+                'user_id': data['user_id'],
+                'category': data['category'],
+                'type': data['type'],
+                'item': data.get('item', 'Unknown'),
+                'price': int(data.get('price', 0)),
+                'date': datetime.strptime(data['date'], '%Y-%m-%d').date(),
+                'location': data.get('location'),
+                'timestamp': datetime.now().time(),
+                'latitude': data.get('latitude'),
+                'longitude': data.get('longitude')
+            }
+        )
+
+        # Get the last inserted ID
+        result = db.session.execute(text("SELECT IDENT_CURRENT('transactions') AS transaction_id"))
+        transaction_id = result.scalar()
         
-        cursor.execute(query, (
-            data.get('user_id'),
-            data.get('item', 'Unknown'),
-            data.get('price', 0),
-            data.get('date'),
-            data.get('category', 'Uncategorized'),
-            data.get('location', 'Unknown'),
-            data.get('type', 'Expense'),
-            data.get('timestamp'),
-            data.get('latitude'),
-            data.get('longitude')
-        ))
-        
-        conn.commit()
-        cursor.close()
-        conn.close()
-        logger.info(f"Data stored successfully for user_id: {data.get('user_id')}")
-    except Exception as e:
-        logger.error(f"Database error: {e}")
+        db.session.commit()
+        logger.info(f"Transaction stored successfully. ID: {transaction_id}")
+        return transaction_id
+
+    except ValueError as e:
+        logger.error(f"Validation error: {str(e)}")
+        db.session.rollback()
         raise
+    except SQLAlchemyError as e:
+        logger.error(f"Database error: {str(e)}")
+        db.session.rollback()
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
+        db.session.rollback()
+        raise
+
+def store_in_database(data):
+    try:
+        # Validate required fields
+        required_fields = ['user_id', 'item', 'price', 'date', 'category', 'type']
+        if not all(field in data for field in required_fields):
+            raise ValueError("Missing required fields")
+
+        # Check if category exists
+        category = Category.query.filter_by(name=data['category']).first()
+        if not category:
+            category = Category(
+                name=data['category'],
+                type=data['type']
+            )
+            db.session.add(category)
+            db.session.flush()
+
+        # Insert transaction using text query
+        insert_stmt = text("""
+            INSERT INTO transactions 
+            (user_id, category, type, item, price, date, location, timestamp, latitude, longitude)
+            VALUES 
+            (:user_id, :category, :type, :item, :price, :date, :location, :timestamp, :latitude, :longitude)
+        """)
+
+        db.session.execute(
+            insert_stmt,
+            {
+                'user_id': data['user_id'],
+                'category': data['category'],
+                'type': data['type'],
+                'item': data.get('item', 'Unknown'),
+                'price': int(data.get('price', 0)),
+                'date': datetime.strptime(data['date'], '%Y-%m-%d').date(),
+                'location': data.get('location'),
+                'timestamp': datetime.now().time(),
+                'latitude': data.get('latitude'),
+                'longitude': data.get('longitude')
+            }
+        )
+
+        # Get the last inserted ID
+        result = db.session.execute(text("SELECT IDENT_CURRENT('transactions') AS transaction_id"))
+        transaction_id = result.scalar()
+        
+        db.session.commit()
+        logger.info(f"Transaction stored successfully. ID: {transaction_id}")
+        return transaction_id
+
+    except ValueError as e:
+        logger.error(f"Validation error: {str(e)}")
+        db.session.rollback()
+        raise
+    except SQLAlchemyError as e:
+        logger.error(f"Database error: {str(e)}")
+        db.session.rollback()
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
+        db.session.rollback()
+        raise
+
 
 @app.route('/process_message', methods=['POST', 'OPTIONS'])
 def process_message():
