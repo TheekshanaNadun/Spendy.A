@@ -1,168 +1,179 @@
-import React, { useEffect, useRef, useState } from 'react';
-import hljs from 'highlight.js';
-import ReactQuill from 'react-quill-new';
-import 'highlight.js/styles/github.css';
+import React, { useState } from 'react';
 
 const TermsConditionLayer = () => {
-    const quillRef = useRef(null);
-    const [value, setValue] = useState(`<div id="editor">
-        <p class="">This policy explains how 6amMart website and related applications (the “Site”, “we” or “us”)
-          collects, uses, shares and protects the personal information that we collect through this site or
-          different channels. 6amMart has established the site to link up the users </p>
-        <p><br /></p>
+  const [expandedSection, setExpandedSection] = useState(null);
+  const [accepted, setAccepted] = useState(false);
 
-        <h6>Using ChatGPT</h6>
-        <p class="">This policy explains how 6amMart website and related applications (the “Site”, “we” or “us”)
-          collects, uses, shares and protects the personal information that we collect through this site or
-          different channels. 6amMart has established the site to link up the users who need foods or grocery items
-          to be shipped or </p>
-        <p><br /></p>
+  const sections = [
+    {
+      title: 'Acceptance of Terms',
+      content: `By accessing and using Spendy.AI ("Service"), you acknowledge and agree to these Terms and Conditions. These terms constitute a legally binding agreement between you ("User", "you", or "your") and Spendy.AI ("we", "us", or "our"). If you do not agree with any part of these terms, you must not use our service.
 
-        <h6>Intellectual Property</h6>
-        <p class="">This policy explains how 6amMart website and related applications (the “Site”, “we” or “us”)
-          collects, uses, shares and protects the personal information that we collect through this site or
-          different channels. 6amMart has established the site to link up the users who need foods or grocery items
-          to be shipped or delivered by the riders from the affiliated restaurants or shops to the desired location.
-          This policy also applies to any mobile applications that we develop for use </p>
-        <p><br /></p>
+      1.1 Service Description
+      Spendy.AI provides financial management and tracking tools, including but not limited to expense tracking, budgeting, and financial visualization services.
 
-        <h6>Using ChatGPT</h6>
-        <p class="">This policy explains how 6amMart website and related applications (the “Site”, “we” or “us”)
-          collects, uses, shares and protects the personal information that we collect through this site or
-          different channels. 6amMart has established the site to link up the users who need foods or grocery items
-          to be shipped or delivered by the riders from the affiliated restaurants or shops to the desired location.
-          This policy also applies to any mobile applications that we develop for use with </p>
-        <p><br /></p>
-        <p> our services on the Site, and references to this “Site”, “we” or “us” is intended . grocery items to be
-          shipped or delivered by the riders from the affiliated restaurants or shops to the desired location. This
-          policy also applies to any mobile applications that we develop for use</p>
+      1.2 User Agreement
+      By using our service, you confirm that you are at least 18 years of age and possess the legal authority to enter into this agreement.`
+    },
+    {
+      title: 'User Responsibilities',
+      content: `2.1 Account Security
+      - You are responsible for maintaining the confidentiality of your account credentials
+      - You must immediately notify us of any unauthorized use of your account
+      - You agree not to share your account access with third parties
 
-        <p>Some initial <strong>bold</strong> text</p>
-        <p><br /></p>
-      </div>`);
-    // eslint-disable-next-line no-unused-vars
-    const [isHighlightReady, setIsHighlightReady] = useState(false);
+      2.2 Prohibited Activities
+      Users shall not:
+      - Attempt to gain unauthorized access to our systems or other user accounts
+      - Upload or transmit malicious code or content
+      - Use the service for any illegal purposes
+      - Interfere with or disrupt the service or servers
+      
+      2.3 Data Accuracy
+      - You are responsible for the accuracy of all data you input
+      - You agree to keep your account information updated
+      - We reserve the right to verify the accuracy of provided information`
+    },
+    {
+      title: 'Privacy and Data Protection',
+      content: `3.1 Data Collection
+      We collect and process personal data as described in our Privacy Policy. This includes:
+      - Account information
+      - Transaction data
+      - Usage statistics
+      - Device information
 
-    useEffect(() => {
-        // Load highlight.js configuration and signal when ready
-        hljs?.configure({
-            languages: ['javascript', 'ruby', 'python', 'java', 'csharp', 'cpp', 'go', 'php', 'swift'],
-        });
+      3.2 Data Security
+      We implement industry-standard security measures to protect your data, including:
+      - End-to-end encryption
+      - Regular security audits
+      - Secure data storage protocols`
+    }
+  ];
 
+  return (
+    <div style={{
+      maxWidth: '900px',
+      margin: '0 auto',
+      padding: '20px',
+      backgroundColor: '#ffffff',
+      borderRadius: '8px',
+      boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+    }}>
+      <div style={{
+        textAlign: 'center',
+        marginBottom: '40px'
+      }}>
+        <h1 style={{
+          fontSize: '48px',
+          color: '#1a2b4e',
+          marginBottom: '16px',
+          fontWeight: '700'
+        }}>Terms and Conditions</h1>
+        <p style={{
+          color: '#666',
+          fontSize: '16px'
+        }}>Effective Date: 2/10/2025</p>
+      </div>
 
+      <div style={{
+        marginBottom: '40px'
+      }}>
+        {sections.map((section, index) => (
+          <div key={index} style={{
+            marginBottom: '16px',
+            backgroundColor: '#fff',
+            borderRadius: '8px',
+            border: '1px solid #eef0f2'
+          }}>
+            <button
+              onClick={() => setExpandedSection(expandedSection === index ? null : index)}
+              style={{
+                width: '100%',
+                padding: '20px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                textAlign: 'left',
+                borderRadius: '8px'
+              }}
+            >
+              <span style={{
+                fontSize: '24px',
+                color: '#1a2b4e',
+                fontWeight: '600'
+              }}>{section.title}</span>
+              <span style={{
+                fontSize: '24px',
+                color: '#1a2b4e'
+              }}>{expandedSection === index ? '−' : '+'}</span>
+            </button>
+            
+            {expandedSection === index && (
+              <div style={{
+                padding: '0 20px 20px',
+                color: '#4a5568',
+                lineHeight: '1.8',
+                fontSize: '16px'
+              }}>
+                {section.content}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
 
-    }, []);
+      <div style={{
+        marginTop: '40px',
+        padding: '20px',
+        backgroundColor: '#f8f9fa',
+        borderRadius: '8px'
+      }}>
+        <label style={{
+          display: 'flex',
+          alignItems: 'center',
+          marginBottom: '20px',
+          cursor: 'pointer'
+        }}>
+          <input
+            type="checkbox"
+            checked={accepted}
+            onChange={(e) => setAccepted(e.target.checked)}
+            style={{
+              marginRight: '12px',
+              width: '20px',
+              height: '20px'
+            }}
+          />
+          <span style={{
+            fontSize: '16px',
+            color: '#1a2b4e'
+          }}>I have read and agree to these Terms and Conditions</span>
+        </label>
 
-    const handleSave = () => {
-        const editorContent = quillRef.current.getEditor().root.innerHTML;
-        console.log("Editor content:", editorContent);
-    };
-
-    // Quill editor modules with syntax highlighting (only load if highlight.js is ready)
-    const modules = isHighlightReady
-        ? {
-            syntax: {
-                highlight: (text) => hljs?.highlightAuto(text).value,  // Enable highlight.js in Quill
-            },
-            toolbar: {
-                container: '#toolbar-container',  // Custom toolbar container
-            },
-        }
-        : {
-            toolbar: {
-                container: '#toolbar-container',  // Custom toolbar container
-            },
-        };
-
-    const formats = [
-        'font', 'size', 'bold', 'italic', 'underline', 'strike', 'color', 'background',
-        'script', 'header', 'blockquote', 'code-block', 'list', 'indent',
-        'direction', 'align', 'link', 'image', 'video', 'formula',
-    ];
-
-    return (
-        <>
-            <div className="card basic-data-table radius-12 overflow-hidden">
-                <div className="card-body p-0">
-                    {/* Editor Toolbar */}
-                    <div id="toolbar-container">
-                        <span className="ql-formats">
-                            <select className="ql-font"></select>
-                            <select className="ql-size"></select>
-                        </span>
-                        <span className="ql-formats">
-                            <button className="ql-bold"></button>
-                            <button className="ql-italic"></button>
-                            <button className="ql-underline"></button>
-                            <button className="ql-strike"></button>
-                        </span>
-                        <span className="ql-formats">
-                            <select className="ql-color"></select>
-                            <select className="ql-background"></select>
-                        </span>
-                        <span className="ql-formats">
-                            <button className="ql-script" value="sub"></button>
-                            <button className="ql-script" value="super"></button>
-                        </span>
-                        <span className="ql-formats">
-                            <button className="ql-header" value="1"></button>
-                            <button className="ql-header" value="2"></button>
-                            <button className="ql-blockquote"></button>
-                            <button className="ql-code-block"></button>
-                        </span>
-                        <span className="ql-formats">
-                            <button className="ql-list" value="ordered"></button>
-                            <button className="ql-list" value="bullet"></button>
-                            <button className="ql-indent" value="-1"></button>
-                            <button className="ql-indent" value="+1"></button>
-                        </span>
-                        <span className="ql-formats">
-                            <button className="ql-direction" value="rtl"></button>
-                            <select className="ql-align"></select>
-                        </span>
-                        <span className="ql-formats">
-                            <button className="ql-link"></button>
-                            <button className="ql-image"></button>
-                            <button className="ql-video"></button>
-                            <button className="ql-formula"></button>
-                        </span>
-                        <span className="ql-formats">
-                            <button className="ql-clean"></button>
-                        </span>
-                    </div>
-
-                    {/* Quill Editor */}
-                    <ReactQuill
-                        ref={quillRef}
-                        theme="snow"
-                        value={value}
-                        onChange={setValue}
-                        modules={modules}
-                        formats={formats}
-                        placeholder="Compose an epic..."
-                    />
-                </div>
-
-                <div className="card-footer p-24 bg-base border border-bottom-0 border-end-0 border-start-0">
-                    <div className="d-flex align-items-center justify-content-center gap-3">
-                        <button
-                            type="button"
-                            className="border border-danger-600 bg-hover-danger-200 text-danger-600 text-md px-50 py-11 radius-8"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="button"
-                            className="btn btn-primary border border-primary-600 text-md px-28 py-12 radius-8"
-                            onClick={handleSave}
-                        >
-                            Save Changes
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </>
-    );
+        <button
+          disabled={!accepted}
+          style={{
+            width: '100%',
+            padding: '16px',
+            backgroundColor: accepted ? '#1a2b4e' : '#cbd5e0',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '16px',
+            fontWeight: '600',
+            cursor: accepted ? 'pointer' : 'not-allowed',
+            transition: 'background-color 0.3s ease'
+          }}
+        >
+          Accept and Continue
+        </button>
+      </div>
+    </div>
+  );
 };
 
 export default TermsConditionLayer;
