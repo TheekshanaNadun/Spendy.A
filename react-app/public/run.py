@@ -164,7 +164,7 @@ def call_kluster_api(message):
     payload = {
         "model": "klusterai/Meta-Llama-3.1-8B-Instruct-Turbo",
         "messages": [
-            {"role": "system", "content": "Extract structured data from the message. Always include the following fields: item, category(analyze), date(%b %d), location, price, and type(Income or Expense). Each data must not have spaces.Keep empty if not available."},
+            {"role": "system", "content": "Extract structured data from the message. Always include the following fields: item, category only  following categoriess:'Food & Groceries', 'Public Transportation (Bus/Train)', 'Three Wheeler Fees', 'Electricity (CEB)', 'Water Supply', 'Entertainment', 'Mobile Prepaid', 'Internet (ADSL/Fiber)', 'Hospital Charges', 'School Fees', 'University Expenses', 'Educational Materials', 'Clothing & Textiles', 'House Rent', 'Home Maintenance', 'Family Events', 'Petrol/Diesel', 'Vehicle Maintenance', 'Vehicle Insurance', 'Bank Loans', 'Credit Card Payments', 'Income Tax', 'Salary', 'Foreign Remittances', 'Rental Income', 'Agricultural Income', 'Business Profits', 'Investment Returns', 'Government Allowances', 'Freelance Income', date(%b %d), location, price, and type(Income or Expense). Each data must not have spaces.Keep empty if not available."},
             {"role": "user", "content": message}
         ],
         "temperature": 0.2,
