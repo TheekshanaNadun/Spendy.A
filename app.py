@@ -15,6 +15,7 @@ import os
 import time
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from flask_cors import cross_origin
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -364,10 +365,13 @@ def session_check():
 
 
 
-@app.route('/api/logout')
+@app.route('/api/logout', methods=['POST'])
+@cross_origin(origins=["http://localhost:3000"], supports_credentials=True)
 def logout():
     session.clear()
     return redirect('http://localhost:3000/', code=302)
+
+
 
 
 

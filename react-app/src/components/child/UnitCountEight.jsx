@@ -41,7 +41,7 @@ const UnitCountEight = () => {
     fetchStats();
     
     // Set up polling every 10 seconds
-    const interval = setInterval(fetchStats, 10000);
+    const interval = setInterval(fetchStats, 100000);
     
     return () => clearInterval(interval);
   }, []);

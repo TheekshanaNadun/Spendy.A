@@ -499,13 +499,24 @@ const MasterLayout = ({ children }) => {
                      
                     
                       <li>
-                        <Link
-                          className='dropdown-item text-black px-0 py-8 hover-bg-transparent hover-text-danger d-flex align-items-center gap-3'
-                          to='http://localhost:5000/api/logout'
-                        >
-                          <Icon icon='lucide:power' className='icon text-xl' />{" "}
-                          Log Out
-                        </Link>
+                      <button
+  className='dropdown-item text-black px-0 py-8 hover-bg-transparent hover-text-danger d-flex align-items-center gap-3'
+  onClick={async () => {
+    try {
+      await fetch('http://localhost:5000/api/logout', {
+        method: 'POST',
+        credentials: 'include'
+      });
+      window.location.href = '/'; // Or use navigate('/') if using React Router
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  }}
+  style={{ background: 'transparent', border: 'none', width: '100%' }}
+>
+  <Icon icon='lucide:power' className='icon text-xl' />
+  Log Out
+</button>
                       </li>
                     </ul>
                   </div>
