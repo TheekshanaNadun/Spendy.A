@@ -79,13 +79,39 @@ const TransactionTable = () => {
  
     const getCategoryIcon = (category) => {
         const icons = {
-            'Food': 'mdi:food',
-            'Transport': 'mdi:car',
-            'Bills': 'mdi:file-document',
-            'Shopping': 'mdi:shopping',
-            'Healthcare': 'mdi:medical-bag',
-            'Education': 'mdi:school',
-            'Income': 'mdi:cash-plus'
+            // Expense Categories
+            'Food & Groceries': 'mdi:cart',
+            'Public Transportation (Bus/Train)': 'mdi:bus',
+            'Three Wheeler Fees': 'mdi:car',
+            'Electricity (CEB)': 'mdi:flash',
+            'Water Supply': 'mdi:water',
+            'Entertainment': 'mdi:party-popper',
+            'Mobile Prepaid': 'mdi:cellphone',
+            'Internet (ADSL/Fiber)': 'mdi:ethernet',
+            'Hospital Charges': 'mdi:hospital',
+            'School Fees': 'mdi:school',
+            'University Expenses': 'mdi:university',
+            'Educational Materials': 'mdi:book-open',
+            'Clothing & Textiles': 'mdi:tshirt-crew',
+            'House Rent': 'mdi:home',
+            'Home Maintenance': 'mdi:tools',
+            'Family Events': 'mdi:account-group',
+            'Petrol/Diesel': 'mdi:gas-station',
+            'Vehicle Maintenance': 'mdi:wrench',
+            'Vehicle Insurance': 'mdi:car-brake-alert',
+            'Bank Loans': 'mdi:bank',
+            'Credit Card Payments': 'mdi:credit-card',
+            'Income Tax': 'mdi:currency-usd',
+    
+            // Income Categories
+            'Salary': 'mdi:wallet',
+            'Foreign Remittances': 'mdi:airplane',
+            'Rental Income': 'mdi:home-city',
+            'Agricultural Income': 'mdi:corn',
+            'Business Profits': 'mdi:briefcase',
+            'Investment Returns': 'mdi:chart-line',
+            'Government Allowances': 'mdi:hand-coin',
+            'Freelance Income': 'mdi:laptop'
         };
         return icons[category] || 'mdi:help-circle';
     };
@@ -465,30 +491,34 @@ const TransactionTable = () => {
                         <div style={{ marginBottom: '1rem' }}>
     <label style={{ display: 'block', marginBottom: '0.5rem' }}>Category:</label>
     <select
-        name="category"
-        value={`${selectedTransaction?.category}|${selectedTransaction?.type}`}
-        onChange={(e) => {
-            const [category, type] = e.target.value.split('|');
-            handleUpdate({
-                ...selectedTransaction,
-                category,
-                type
-            });
-        }}
-        style={{
-            width: '100%',
-            padding: '0.5rem',
-            border: '1px solid black',
-            borderRadius: '4px'
-        }}
-    >
-        <option value="">Select Category</option>
-        {categories.map(cat => (
-            <option key={cat.category_id} value={`${cat.name}|${cat.type}`}>
-                {cat.name} ({cat.type})
-            </option>
-        ))}
-    </select>
+    name="category"
+    value={`${selectedTransaction?.category}|${selectedTransaction?.type}`}
+    onChange={(e) => {
+        const [category, type] = e.target.value.split('|');
+        setSelectedTransaction(prev => ({
+            ...prev,
+            category,
+            type
+        }));
+    }}
+    style={{
+        width: '100%',
+        padding: '0.5rem',
+        border: '1px solid black',
+        borderRadius: '4px'
+    }}
+>
+    <option value="">Select Category</option>
+    {categories.map(cat => (
+        <option 
+            key={cat.category_id} 
+            value={`${cat.name}|${cat.type}`}
+        >
+            {cat.name} ({cat.type})
+        </option>
+    ))}
+</select>
+
 </div>
                     </div>
                 </div>

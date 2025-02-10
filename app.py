@@ -619,12 +619,39 @@ def manage_transaction(transaction_id):
         data = request.get_json()
         
         try:
+            # Handle combined category|type format
+            if 'category' in data:
+                if '|' not in data['category']:
+                    return jsonify({"error": "Invalid category format. Use 'Category|Type'"}), 400
+                
+                category_parts = data['category'].split('|')
+                if len(category_parts) != 2:
+                    return jsonify({"error": "Invalid category format. Use 'Category|Type'"}), 400
+                
+                category_name, category_type = category_parts
+                category_type = category_type.capitalize()
+
+                # Validate category exists with exact type
+                existing_category = Category.query.filter_by(
+                    name=category_name.strip(),
+                    type=category_type
+                ).first()
+
+                if not existing_category:
+                    return jsonify({
+                        "error": f"Category '{category_name}' with type '{category_type}' not found"
+                    }), 400
+
+                # Update both fields from the combined value
+                transaction.category = existing_category.name
+                transaction.type = existing_category.type
+
             # Handle date conversion
             if 'date' in data:
                 transaction.date = datetime.strptime(data['date'], '%Y-%m-%d').date()
             
-            # Update other fields
-            fields = ['item', 'price', 'location', 'category', 'type',
+            # Update other fields (excluding category/type which we handled above)
+            fields = ['item', 'price', 'location', 
                      'timestamp', 'latitude', 'longitude']
             for field in fields:
                 if field in data:
@@ -634,12 +661,25 @@ def manage_transaction(transaction_id):
             return jsonify({"message": "Transaction updated"}), 200
             
         except ValueError as e:
+            db.session.rollback()
             return jsonify({"error": str(e)}), 400
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            app.logger.error(f'Database error: {str(e)}')
+            return jsonify({"error": "Database operation failed"}), 500
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f'Unexpected error: {str(e)}')
+            return jsonify({"error": "Server error"}), 500
         
     if request.method == 'DELETE':
-        db.session.delete(transaction)
-        db.session.commit()
-        return jsonify({"message": "Transaction deleted"}), 200
+        try:
+            db.session.delete(transaction)
+            db.session.commit()
+            return jsonify({"message": "Transaction deleted"}), 200
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            return jsonify({"error": "Failed to delete transaction"}), 500
 
 @app.after_request
 def handle_options(response):
