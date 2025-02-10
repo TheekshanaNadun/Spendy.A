@@ -77,7 +77,6 @@ const TablesBorderColors = () => {
                                 <thead>
                                     <tr>
                                         <th>Item Name</th>
-                                        <th style={{ width: '100px' }}>T.ID</th>
                                         <th>Category</th>
                                         <th style={{ width: '100px' }}>Date</th>
                                         <th style={{ width: '100px' }}>Amount</th>
@@ -87,9 +86,7 @@ const TablesBorderColors = () => {
                                     {displayData.map((transaction, index) => (
                                         <tr key={transaction.transaction_id || index}>
                                             <td>{transaction.item || '----------'}</td>
-                                            <td style={{ width: '100px' }}>
-                                                {transaction.transaction_id?.toString().slice(-6) || '------'}
-                                            </td>
+                                           
                                             <td>
                                                 <div className="d-flex align-items-center">
                                                     <Icon 

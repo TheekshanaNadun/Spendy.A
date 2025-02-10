@@ -99,7 +99,6 @@ const ExpenseTransactionsTable = () => {
                                 <thead>
                                     <tr>
                                         <th className="bg-base">Item Name</th>
-                                        <th className="bg-base" style={{ width: '100px' }}>T.ID</th>
                                         <th className="bg-base" >Category</th>
                                         <th className="bg-base"style={{ width: '100px' }}>Date</th>
                                         <th className="bg-base" style={{ width: '100px' }}>Amount</th>
@@ -111,9 +110,7 @@ const ExpenseTransactionsTable = () => {
                                             <td className="bg-primary-light">
                                                 {transaction.item || '----------'}
                                             </td>
-                                            <td className="bg-success-focus" style={{ width: '100px' }}>
-                                                {transaction.transaction_id?.toString().slice(-6) || '------'}
-                                            </td>
+                                          
                                             <td className="bg-info-focus">
                                                 <div className="d-flex align-items-center">
                                                     <Icon 

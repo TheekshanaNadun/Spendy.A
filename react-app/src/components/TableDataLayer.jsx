@@ -24,25 +24,41 @@ const TransactionTable = () => {
                 const response = await fetch(`http://localhost:5000/api/transactions?page=${pagination.currentPage}`, {
                     credentials: 'include'
                 });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
+    
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 
                 const data = await response.json();
                 
+                // Proper cleanup before state update
                 if ($.fn.DataTable.isDataTable('#transactionTable')) {
-                    $('#transactionTable').DataTable().destroy();
+                    $('#transactionTable').DataTable().destroy(true);
                 }
-
+    
                 setTransactions(data);
-                
-                $('#transactionTable').DataTable({
-                    paging: false,
-                    searching: true,
-                    info: false
-                });
-
+    
+                // Initialize after DOM update
+                setTimeout(() => {
+                    $('#transactionTable').DataTable({
+                        paging: false,
+                        searching: true,
+                        info: false,
+                        columnDefs: [
+                            { 
+                                targets: [0], // Hidden ID column
+                                visible: false,
+                                searchable: false
+                            },
+                            {
+                                targets: 4, // Date column
+                                type: 'date',
+                                render: function(data) {
+                                    return new Date(data).toLocaleDateString('en-GB');
+                                }
+                            }
+                        ]
+                    });
+                }, 0);
+    
             } catch (error) {
                 console.error('Error:', error);
             } finally {
@@ -51,6 +67,7 @@ const TransactionTable = () => {
         };
         fetchTransactions();
     }, [pagination.currentPage]);
+    
 
     const [categories, setCategories] = useState([]);
 
@@ -78,41 +95,41 @@ const TransactionTable = () => {
 
  
     const getCategoryIcon = (category) => {
-        const icons = {
-            // Expense Categories
-            'Food & Groceries': 'mdi:cart',
-            'Public Transportation (Bus/Train)': 'mdi:bus',
-            'Three Wheeler Fees': 'mdi:car',
-            'Electricity (CEB)': 'mdi:flash',
-            'Water Supply': 'mdi:water',
-            'Entertainment': 'mdi:party-popper',
-            'Mobile Prepaid': 'mdi:cellphone',
-            'Internet (ADSL/Fiber)': 'mdi:ethernet',
-            'Hospital Charges': 'mdi:hospital',
-            'School Fees': 'mdi:school',
-            'University Expenses': 'mdi:university',
-            'Educational Materials': 'mdi:book-open',
-            'Clothing & Textiles': 'mdi:tshirt-crew',
-            'House Rent': 'mdi:home',
-            'Home Maintenance': 'mdi:tools',
-            'Family Events': 'mdi:account-group',
-            'Petrol/Diesel': 'mdi:gas-station',
-            'Vehicle Maintenance': 'mdi:wrench',
-            'Vehicle Insurance': 'mdi:car-brake-alert',
-            'Bank Loans': 'mdi:bank',
-            'Credit Card Payments': 'mdi:credit-card',
-            'Income Tax': 'mdi:currency-usd',
-    
-            // Income Categories
-            'Salary': 'mdi:wallet',
-            'Foreign Remittances': 'mdi:airplane',
-            'Rental Income': 'mdi:home-city',
-            'Agricultural Income': 'mdi:corn',
-            'Business Profits': 'mdi:briefcase',
-            'Investment Returns': 'mdi:chart-line',
-            'Government Allowances': 'mdi:hand-coin',
-            'Freelance Income': 'mdi:laptop'
-        };
+       const icons = {
+        // Expense Categories
+        'Food & Groceries': 'mdi:cart',
+        'Public Transportation (Bus/Train)': 'mdi:bus',
+        'Three Wheeler Fees': 'mdi:car',
+        'Electricity (CEB)': 'mdi:flash',
+        'Water Supply': 'mdi:water',
+        'Entertainment': 'mdi:party-popper',
+        'Mobile Prepaid': 'mdi:cellphone',
+        'Internet (ADSL/Fiber)': 'mdi:ethernet',
+        'Hospital Charges': 'mdi:hospital',
+        'School Fees': 'mdi:school',
+        'University Expenses': 'mdi:university',
+        'Educational Materials': 'mdi:book-open',
+        'Clothing & Textiles': 'mdi:tshirt-crew',
+        'House Rent': 'mdi:home',
+        'Home Maintenance': 'mdi:tools',
+        'Family Events': 'mdi:account-group',
+        'Petrol/Diesel': 'mdi:gas-station',
+        'Vehicle Maintenance': 'mdi:wrench',
+        'Vehicle Insurance': 'mdi:car-brake-alert',
+        'Bank Loans': 'mdi:bank',
+        'Credit Card Payments': 'mdi:credit-card',
+        'Income Tax': 'mdi:currency-usd',
+
+        // Income Categories
+        'Salary': 'mdi:wallet',
+        'Foreign Remittances': 'mdi:airplane',
+        'Rental Income': 'mdi:home-city',
+        'Agricultural Income': 'mdi:corn',
+        'Business Profits': 'mdi:briefcase',
+        'Investment Returns': 'mdi:chart-line',
+        'Government Allowances': 'mdi:hand-coin',
+        'Freelance Income': 'mdi:laptop'
+    };
         return icons[category] || 'mdi:help-circle';
     };
     
@@ -518,6 +535,7 @@ const TransactionTable = () => {
         </option>
     ))}
 </select>
+
 
 </div>
                     </div>
