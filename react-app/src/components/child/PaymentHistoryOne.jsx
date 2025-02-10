@@ -70,15 +70,41 @@ const handlePageChange = (newPage) => {
 
     const getCategoryIcon = (category) => {
         const icons = {
-            'Food': 'mdi:food',
-            'Transport': 'mdi:car',
-            'Bills': 'mdi:file-document',
-            'Shopping': 'mdi:shopping',
-            'Healthcare': 'mdi:medical-bag',
-            'Education': 'mdi:school',
-            'Income': 'mdi:cash-plus'
+            // Expense Categories
+            'Food & Groceries': 'mdi:cart',
+            'Public Transportation (Bus/Train)': 'mdi:bus',
+            'Three Wheeler Fees': 'mdi:car',
+            'Electricity (CEB)': 'mdi:flash',
+            'Water Supply': 'mdi:water',
+            'Entertainment': 'mdi:party-popper',
+            'Mobile Prepaid': 'mdi:cellphone',
+            'Internet (ADSL/Fiber)': 'mdi:ethernet',
+            'Hospital Charges': 'mdi:hospital',
+            'School Fees': 'mdi:school',
+            'University Expenses': 'mdi:university',
+            'Educational Materials': 'mdi:book-open',
+            'Clothing & Textiles': 'mdi:tshirt-crew',
+            'House Rent': 'mdi:home',
+            'Home Maintenance': 'mdi:tools',
+            'Family Events': 'mdi:account-group',
+            'Petrol/Diesel': 'mdi:gas-station',
+            'Vehicle Maintenance': 'mdi:wrench',
+            'Vehicle Insurance': 'mdi:car-brake-alert',
+            'Bank Loans': 'mdi:bank',
+            'Credit Card Payments': 'mdi:credit-card',
+            'Income Tax': 'mdi:currency-usd',
+    
+            // Income Categories
+            'Salary': 'mdi:wallet',
+            'Foreign Remittances': 'mdi:airplane',
+            'Rental Income': 'mdi:home-city',
+            'Agricultural Income': 'mdi:corn',
+            'Business Profits': 'mdi:briefcase',
+            'Investment Returns': 'mdi:chart-line',
+            'Government Allowances': 'mdi:hand-coin',
+            'Freelance Income': 'mdi:laptop'
         };
-        return icons[category] || 'mdi:help-circle';
+        return icons[category] || 'mdi:wallet';
     };
 
     if (loading) {
