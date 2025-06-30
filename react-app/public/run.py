@@ -1,6 +1,5 @@
 from flask import Flask, request, jsonify
 import requests
-import pyodbc
 from datetime import datetime
 from dotenv import load_dotenv
 from flask_cors import CORS
@@ -14,8 +13,12 @@ from flask_sqlalchemy import SQLAlchemy
 
 
 app = Flask(__name__)
-# Configure SQL Server connection
-app.config['SQLALCHEMY_DATABASE_URI'] = "mssql+pyodbc://@MSI\\SQLEXPRESS/spendy_ai?driver=ODBC+Driver+17+for+SQL+Server&Trusted_Connection=yes"
+# Configure MySQL connection
+db_user = os.getenv('MYSQL_USER')
+db_password = os.getenv('MYSQL_PASSWORD')
+db_host = os.getenv('MYSQL_HOST')
+db_name = os.getenv('MYSQL_DATABASE')
+app.config['SQLALCHEMY_DATABASE_URI'] = f"mysql+pymysql://{db_user}:{db_password}@{db_host}/{db_name}"
 # In your database configuration
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'implicit_returning': False,
@@ -39,6 +42,7 @@ CORS(app,
     }
 )
 db = SQLAlchemy(app)
+
 # Database Models
 class User(db.Model):
     __tablename__ = 'users'
@@ -119,10 +123,6 @@ load_dotenv()
 KLUSTER_API_URL = "https://api.kluster.ai/v1/chat/completions"
 KLUSTER_API_KEY = os.getenv("KLUSTER_API_KEY")
 
-server = r'MSI\SQLEXPRESS'
-database = 'spendy_ai'
-connection_string = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server};DATABASE={database};Trusted_Connection=yes"
-
 def verify_auth():
     try:
         # Forward all cookies and headers
@@ -133,7 +133,7 @@ def verify_auth():
         }
         
         auth_response = requests.get(
-            'http://localhost:5000/api/session-check',
+            'http://api:5000/api/session-check',
             cookies=cookies,
             headers=headers
         )
@@ -148,7 +148,7 @@ def get_user_id():
     try:
         cookies = {k: v for k, v in request.cookies.items()}
         auth_response = requests.get(
-            'http://localhost:5000/api/session-check',
+            'http://api:5000/api/session-check',
             cookies=cookies
         )
         if auth_response.status_code == 200:
@@ -240,68 +240,6 @@ def parse_kluster_response(response):
         return None
 
 
-
-def store_in_database(data):
-    try:
-        # Validate required fields
-        required_fields = ['user_id', 'item', 'price', 'date', 'category', 'type']
-        if not all(field in data for field in required_fields):
-            raise ValueError("Missing required fields")
-
-        # Check if category exists
-        category = Category.query.filter_by(name=data['category']).first()
-        if not category:
-            category = Category(
-                name=data['category'],
-                type=data['type']
-            )
-            db.session.add(category)
-            db.session.flush()
-
-        # Insert transaction using text query
-        insert_stmt = text("""
-            INSERT INTO transactions 
-            (user_id, category, type, item, price, date, location, timestamp, latitude, longitude)
-            VALUES 
-            (:user_id, :category, :type, :item, :price, :date, :location, :timestamp, :latitude, :longitude)
-        """)
-
-        db.session.execute(
-            insert_stmt,
-            {
-                'user_id': data['user_id'],
-                'category': data['category'],
-                'type': data['type'],
-                'item': data.get('item', 'Unknown'),
-                'price': int(data.get('price', 0)),
-                'date': datetime.strptime(data['date'], '%Y-%m-%d').date(),
-                'location': data.get('location'),
-                'timestamp': datetime.now().time(),
-                'latitude': data.get('latitude'),
-                'longitude': data.get('longitude')
-            }
-        )
-
-        # Get the last inserted ID
-        result = db.session.execute(text("SELECT IDENT_CURRENT('transactions') AS transaction_id"))
-        transaction_id = result.scalar()
-        
-        db.session.commit()
-        logger.info(f"Transaction stored successfully. ID: {transaction_id}")
-        return transaction_id
-
-    except ValueError as e:
-        logger.error(f"Validation error: {str(e)}")
-        db.session.rollback()
-        raise
-    except SQLAlchemyError as e:
-        logger.error(f"Database error: {str(e)}")
-        db.session.rollback()
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
-        db.session.rollback()
-        raise
 
 def store_in_database(data):
     try:

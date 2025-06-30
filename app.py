@@ -16,10 +16,14 @@ import time
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from flask_cors import cross_origin
+from dotenv import load_dotenv
+from flask_mail import Mail, Message
+
+load_dotenv()
 
 # Initialize Flask app
 app = Flask(__name__)
-app.secret_key = "d3bcef141597b4c00a9e4dccb893d1b3d3bcef141597b4c00a9e4dccb893d1b3"
+app.secret_key = os.getenv("SECRET_KEY")
 OTP_EXPIRY = 300  # 5 minutes
 
 
@@ -38,8 +42,13 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=timedelta(hours=1)
 )
 
-# Configure SQL Server connection
-app.config['SQLALCHEMY_DATABASE_URI'] = "mssql+pyodbc://@MSI\\SQLEXPRESS/spendy_ai?driver=ODBC+Driver+17+for+SQL+Server&Trusted_Connection=yes"
+# Configure MySQL connection
+db_user = os.getenv('MYSQL_USER')
+db_password = os.getenv('MYSQL_PASSWORD')
+db_host = os.getenv('MYSQL_HOST')
+db_name = os.getenv('MYSQL_DATABASE')
+app.config['SQLALCHEMY_DATABASE_URI'] = f"mysql+pymysql://{db_user}:{db_password}@{db_host}/{db_name}"
+
 # In your database configuration
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'implicit_returning': False,
@@ -52,7 +61,7 @@ db = SQLAlchemy(app)
 # Configure CORS
 CORS(app, 
      resources={r"/api/*": {
-         "origins": "http://localhost:3000",
+         "origins": ["http://localhost", "http://localhost:80", "http://localhost:3000"],
          "supports_credentials": True,
          "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
          "allow_headers": ["Content-Type", "Authorization"]
@@ -191,15 +200,13 @@ def send_otp_email(recipient_email, otp):
 
 
 # Add after app initialization
-from flask_mail import Mail, Message
-
 app.config.update(
-    MAIL_SERVER='smtp.gmail.com',
-    MAIL_PORT=587,
-    MAIL_USE_TLS=True,
-    MAIL_USERNAME='tikka1030@gmail.com',
-    MAIL_PASSWORD='ubdo tcls esbn qeuu',
-    MAIL_DEFAULT_SENDER='tikka1030@gmail.com'
+    MAIL_SERVER=os.getenv('MAIL_SERVER'),
+    MAIL_PORT=int(os.getenv('MAIL_PORT', 587)),
+    MAIL_USE_TLS=os.getenv('MAIL_USE_TLS', 'true').lower() in ['true', '1', 't'],
+    MAIL_USERNAME=os.getenv('MAIL_USERNAME'),
+    MAIL_PASSWORD=os.getenv('MAIL_PASSWORD'),
+    MAIL_DEFAULT_SENDER=os.getenv('MAIL_USERNAME')
 )
 
 mail = Mail(app)
@@ -208,6 +215,7 @@ limiter = Limiter(
     key_func=get_remote_address,
     default_limits=["200 per hour", "50 per minute"]
 )
+
 # Modified login route
 @app.route('/api/login', methods=['POST'])
 def login():
@@ -686,22 +694,14 @@ def manage_transaction(transaction_id):
             return jsonify({"error": "Failed to delete transaction"}), 500
 
 @app.after_request
-def handle_options(response):
+def add_cors_headers(response):
+    origin = request.headers.get('Origin')
+    allowed_origins = ['http://localhost', 'http://localhost:80', 'http://localhost:3000']
+    if origin in allowed_origins:
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, PATCH, OPTIONS'
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
-    return response
-def convert_to_json(response):
-    if response.content_type == 'text/html':
-        try:
-            error_data = {
-                "error": "Unexpected HTML response",
-                "status": response.status_code,
-                "message": response.get_data(as_text=True)[:100]
-            }
-            response = jsonify(error_data)
-            response.status_code = 500
-        except Exception as e:
-            app.logger.error(f"JSON conversion failed: {str(e)}")
     return response
 
 @app.route('/api/transactions/expense', methods=['GET'])

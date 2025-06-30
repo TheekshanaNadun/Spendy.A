@@ -1,20 +1,72 @@
 version: '3.8'
 
 services:
-  redis:
-    image: redis:latest
-    container_name: redis
+  db:
+    image: mysql:8.0
+    platform: linux/arm64
+    container_name: spendy_mysql_db
+    environment:
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
+      MYSQL_DATABASE: "${MYSQL_DATABASE}"
+      MYSQL_USER: "${MYSQL_USER}"
+      MYSQL_PASSWORD: "${MYSQL_PASSWORD}"
     ports:
-      - "6379:6379"
+      - "3307:3306"
+    volumes:
+      - spendy_db_data:/var/lib/mysql
+      - ./init-db:/docker-entrypoint-initdb.d
 
-  flask:
+  api:
     build:
-      context: ./react-app  # Adjust path if necessary
+      context: .
       dockerfile: Dockerfile
-    container_name: flask-app
+    container_name: spendy_api
+    command: flask run --host=0.0.0.0 --port=5000
+    volumes:
+      - .:/app
     ports:
       - "5000:5000"
-    volumes:
-      - ./react-app:/app  # Mount your Flask app directory
+    env_file:
+      - .env
     depends_on:
-      - redis
+      - db
+
+  processor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: spendy_processor
+    command: python react-app/public/run.py
+    volumes:
+      - .:/app
+    ports:
+      - "3001:3001"
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - api
+
+  frontend:
+    build:
+      context: ./react-app
+      dockerfile: Dockerfile
+    container_name: spendy_frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+      - processor
+  
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: spendy_phpmyadmin
+    ports:
+      - 8080:80
+    environment:
+      - PMA_ARBITRARY=1
+    depends_on:
+      - db
+
+volumes:
+  spendy_db_data:
