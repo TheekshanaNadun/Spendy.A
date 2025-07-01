@@ -33,27 +33,43 @@ with app.app_context():
     db.session.add_all(categories)
     db.session.commit()
 
-    # Helper to get random date in June or July 2025
-    def random_date():
-        start = datetime(2025, 6, 1)
-        end = datetime(2025, 7, 31)
-        delta = end - start
-        return (start + timedelta(days=random.randint(0, delta.days))).date()
+    # Helper to get a date offset from a start date
+    def date_offset(start, offset):
+        return (start + timedelta(days=offset)).date()
 
-    # Create 100 random transactions for user_id 1 only
     all_categories = Category.query.all()
-    for _ in range(100):
-        cat = random.choice(all_categories)
-        price = random.randint(500, 50000) if cat.type == "Expense" else random.randint(1000, 100000)
+    expense_cats = [c for c in all_categories if c.type == "Expense"]
+    income_cats = [c for c in all_categories if c.type == "Income"]
+
+    # Generate 100 unique days for Expense (realistic, trending data)
+    expense_start = datetime(2025, 6, 1)
+    for i in range(100):
+        cat = random.choice(expense_cats)
+        price = 5000 + i*10 + random.randint(-500, 500)  # upward trend + noise
         t = Transaction(
             user_id=1,
             category=cat.name,
             type=cat.type,
-            item=f"{cat.name} Item {_+1}",
+            item=f"{cat.name} Item Expense {i+1}",
             price=price,
-            date=random_date()
+            date=date_offset(expense_start, i)
+        )
+        db.session.add(t)
+
+    # Generate 100 unique days for Income (realistic, trending data)
+    income_start = datetime(2025, 6, 1)
+    for i in range(100):
+        cat = random.choice(income_cats)
+        price = 10000 + i*20 + random.randint(-1000, 1000)  # upward trend + noise
+        t = Transaction(
+            user_id=1,
+            category=cat.name,
+            type=cat.type,
+            item=f"{cat.name} Item Income {i+1}",
+            price=price,
+            date=date_offset(income_start, i)
         )
         db.session.add(t)
     db.session.commit()
 
-    print("Database seeded with 100 transactions for June and July 2025!") 
+    print("Database seeded with 200 realistic, trending transactions (100 unique days for both income and expense) for June 1 - Sept 8, 2025!") 

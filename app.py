@@ -992,18 +992,24 @@ def predict_next_month():
         # --- Accuracy metrics for Expense ---
         def get_arima_accuracy(series):
             if len(series) < 40:
+                app.logger.error(f'ARIMA accuracy error: Not enough data points (len={len(series)})')
+                print(f'ARIMA accuracy error: Not enough data points (len={len(series)})')
                 return None  # Not enough data for train/test split
             train = series.iloc[:-30]
             test = series.iloc[-30:]
             try:
+                app.logger.info(f'ARIMA fitting: train len={len(train)}, test len={len(test)}, train sample={train.head(3).tolist()}...')
+                print(f'ARIMA fitting: train len={len(train)}, test len={len(test)}, train sample={train.head(3).tolist()}...')
                 model = ARIMA(train, order=(1,1,1))
                 model_fit = model.fit()
                 forecast = model_fit.forecast(steps=30)
                 mae = mean_absolute_error(test, forecast)
-                rmse = mean_squared_error(test, forecast, squared=False)
+                rmse = mean_squared_error(test, forecast) ** 0.5  # Manual sqrt for RMSE
                 mape = (abs((test - forecast) / test.replace(0, 1))).mean() * 100
                 return {'mae': float(mae), 'rmse': float(rmse), 'mape': float(mape)}
-            except Exception:
+            except Exception as e:
+                app.logger.error(f'ARIMA accuracy error: {e}')
+                print(f'ARIMA accuracy error: {e}')
                 return None
 
         expense_accuracy = get_arima_accuracy(expense_df['price'])
