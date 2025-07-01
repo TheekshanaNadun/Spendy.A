@@ -21,7 +21,10 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: spendy_api
-    command: flask run --host=0.0.0.0 --port=5000
+    command: flask run --host=0.0.0.0 --port=5000 --reload
+    environment:
+      FLASK_ENV: development
+      FLASK_APP: app.py
     volumes:
       - .:/app
     ports:
@@ -36,7 +39,9 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: spendy_processor
-    command: python react-app/public/run.py
+    environment:
+      - LOGLEVEL=WARNING
+    command: watchmedo auto-restart --ignore-patterns='.git/*' --patterns='*.py' --recursive -- python react-app/public/run.py
     volumes:
       - .:/app
     ports:
@@ -48,16 +53,21 @@ services:
       - api
 
   frontend:
-    build:
-      context: ./react-app
-      dockerfile: Dockerfile
+    image: node:18-alpine
+    working_dir: /app
     container_name: spendy_frontend
+    command: sh -c "npm install && npm start"
+    environment:
+      - NODE_ENV=development
+      - CHOKIDAR_USEPOLLING=true
+    volumes:
+      - ./react-app:/app
     ports:
-      - "80:80"
+      - "3000:3000"
     depends_on:
       - api
       - processor
-  
+
   phpmyadmin:
     image: phpmyadmin:latest
     container_name: spendy_phpmyadmin

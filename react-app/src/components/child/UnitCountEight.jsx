@@ -1,65 +1,36 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
+import { useDashboardData } from "../DashboardDataProvider";
 
 const UnitCountEight = () => {
-  const [stats, setStats] = useState({
-    currentMonthIncome: 0,
-    lastMonthIncome: 0,
-    currentMonthExpense: 0,
-    lastMonthExpense: 0,
-    netProfit: 0,
-    totalSavings: 0,
-    loading: true,
-    error: null
-  });
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const response = await fetch('http://localhost:5000/api/stats', {
-          credentials: 'include'
-      });
-
-        if (!response.ok) throw new Error('Failed to fetch stats');
-        
-        const data = await response.json();
-        setStats(prev => ({
-          ...prev,
-          ...data,
-          loading: false,
-          error: null
-        }));
-      } catch (err) {
-        setStats(prev => ({
-          ...prev,
-          loading: false,
-          error: err.message
-        }));
-      }
-    };
-
-    // Initial fetch
-    fetchStats();
-    
-    // Set up polling every 10 seconds
-    const interval = setInterval(fetchStats, 100000);
-    
-    return () => clearInterval(interval);
-  }, []);
+  const { dashboardData, loading, error } = useDashboardData();
 
   const formatCurrency = (amount) => {
+    const safeValue = typeof amount === 'number' && !isNaN(amount) ? amount : 0;
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'LKR'
-    }).format(amount);
+    }).format(safeValue);
   };
 
   const calculatePercentageChange = (current, previous) => {
-    if (previous === 0) return '0%';
+    if (!previous || previous === 0) return '0%';
     return `${(((current - previous) / previous) * 100).toFixed(1)}%`;
   };
 
-  if (stats.loading) return <div className="text-center">Loading statistics...</div>;
-  if (stats.error) return <div className="text-center text-danger">Error: {stats.error}</div>;
+  if (loading) return <div className="text-center">Loading statistics...</div>;
+  if (error) return <div className="text-center text-danger">Error: {error}</div>;
+  if (!dashboardData) return null;
+
+  // Map the required fields from dashboardData
+  const {
+    currentMonthIncome = 0,
+    lastMonthIncome = 0,
+    currentMonthExpense = 0,
+    lastMonthExpense = 0,
+    totalSavings = 0
+  } = dashboardData;
+
+  const thisMonthBalance = currentMonthIncome - currentMonthExpense;
 
   return (
     <div className='row gy-4'>
@@ -74,16 +45,16 @@ const UnitCountEight = () => {
                 </span>
                 <div>
                   <span className='fw-medium text-secondary-light text-md'>This Month Income</span>
-                  <h6 className='fw-semibold mt-2'>{formatCurrency(stats.currentMonthIncome)}</h6>
+                  <h6 className='fw-semibold mt-2'>{formatCurrency(currentMonthIncome)}</h6>
                 </div>
               </div>
             </div>
             <p className='text-sm mb-0 d-flex align-items-center flex-wrap gap-12 mt-12 text-secondary-light'>
               <span className='bg-success-focus px-6 py-2 rounded-2 fw-medium text-success-main text-sm d-flex align-items-center gap-1'>
                 <i className='ri-arrow-right-up-line' /> 
-                {calculatePercentageChange(stats.currentMonthIncome, stats.lastMonthIncome)}
+                {calculatePercentageChange(currentMonthIncome, lastMonthIncome)}
               </span>
-              Last month {formatCurrency(stats.lastMonthIncome)}
+              Last month {formatCurrency(lastMonthIncome)}
             </p>
           </div>
         </div>
@@ -100,16 +71,16 @@ const UnitCountEight = () => {
                 </span>
                 <div>
                   <span className='fw-medium text-secondary-light text-md'>This Month Expenses</span>
-                  <h6 className='fw-semibold mt-2'>{formatCurrency(stats.currentMonthExpense)}</h6>
+                  <h6 className='fw-semibold mt-2'>{formatCurrency(currentMonthExpense)}</h6>
                 </div>
               </div>
             </div>
             <p className='text-sm mb-0 d-flex align-items-center flex-wrap gap-12 mt-12 text-secondary-light'>
               <span className='bg-success-focus px-6 py-2 rounded-2 fw-medium text-success-main text-sm d-flex align-items-center gap-1'>
                 <i className='ri-arrow-right-up-line' /> 
-                {calculatePercentageChange(stats.currentMonthExpense, stats.lastMonthExpense)}
+                {calculatePercentageChange(currentMonthExpense, lastMonthExpense)}
               </span>
-              Last month {formatCurrency(stats.lastMonthExpense)}
+              Last month {formatCurrency(lastMonthExpense)}
             </p>
           </div>
         </div>
@@ -126,7 +97,7 @@ const UnitCountEight = () => {
                 </span>
                 <div>
                   <span className='fw-medium text-secondary-light text-md'>This Month Balance</span>
-                  <h6 className='fw-semibold mt-2'>{formatCurrency(stats.netProfit)}</h6>
+                  <h6 className='fw-semibold mt-2'>{formatCurrency(thisMonthBalance)}</h6>
                 </div>
               </div>
             </div>
@@ -145,7 +116,7 @@ const UnitCountEight = () => {
                 </span>
                 <div>
                   <span className='fw-medium text-secondary-light text-md'>Lifetime Saving</span>
-                  <h6 className='fw-semibold mt-2'>{formatCurrency(stats.totalSavings)}</h6>
+                  <h6 className='fw-semibold mt-2'>{formatCurrency(totalSavings)}</h6>
                 </div>
               </div>
             </div>

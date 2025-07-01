@@ -7,10 +7,8 @@ const TransactionTable = () => {
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const itemsPerPage = 10;
     const [currentPage, setCurrentPage] = useState(1);
-    const [totalItems, setTotalItems] = useState(0);
-
+    const itemsPerPage = 10;
 
     useEffect(() => {
       const fetchTransactions = async () => {
@@ -25,7 +23,6 @@ const TransactionTable = () => {
             }
             
             const data = await response.json();
-            
             if (!Array.isArray(data)) {
                 throw new Error('Invalid data format from server');
             }
@@ -41,7 +38,6 @@ const TransactionTable = () => {
             }));
 
             setTransactions(formattedTransactions);
-            setTotalItems(data.length);
             setError(null);
             
             $('#transactionTable').DataTable({
@@ -60,10 +56,8 @@ const TransactionTable = () => {
     fetchTransactions();
 }, [currentPage]);
 
-const totalPages = Math.ceil(totalItems / itemsPerPage);
-
 const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= totalPages) {
+    if (newPage >= 1) {
         setCurrentPage(newPage);
     }
 };
@@ -145,31 +139,16 @@ const handlePageChange = (newPage) => {
               </h5>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                   <span>
-                      Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} entries
+                      Page {currentPage}
                   </span>
                   <button
-                      onClick={() => handlePageChange(currentPage - 1)}
-                      disabled={currentPage === 1}
-                      style={{
-                          padding: '0.5rem 1rem',
-                          borderRadius: '4px',
-                          border: '1px solid var(--border-color, #E5E7EB)',
-                          backgroundColor: currentPage !== 1 ? 'white' : '#f3f4f6',
-                          cursor: currentPage !== 1 ? 'pointer' : 'not-allowed'
-                      }}
-                  >
-                      Previous
-                  </button>
-                  <span>Page {currentPage} of {totalPages}</span>
-                  <button
                       onClick={() => handlePageChange(currentPage + 1)}
-                      disabled={currentPage === totalPages}
                       style={{
                           padding: '0.5rem 1rem',
                           borderRadius: '4px',
                           border: '1px solid var(--border-color, #E5E7EB)',
-                          backgroundColor: currentPage !== totalPages ? 'white' : '#f3f4f6',
-                          cursor: currentPage !== totalPages ? 'pointer' : 'not-allowed'
+                          backgroundColor: 'white',
+                          cursor: 'pointer'
                       }}
                   >
                       Next

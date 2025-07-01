@@ -61,13 +61,13 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "proxy": "http://localhost:5000",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "server": "nodemon server.js",
     "dev": "concurrently \"npm run server\" \"npm start\""
   },
+  "proxy": "http://api:5000",
   "eslintConfig": {
     "extends": [
       "react-app",

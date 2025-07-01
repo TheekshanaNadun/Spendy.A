@@ -3,12 +3,10 @@ import UnitCountEight from "./child/UnitCountEight";
 import BalanceStatistic from "./child/BalanceStatistic";
 import EarningCategories from "./child/EarningCategories";
 import ExpenseStatistics from "./child/ExpenseStatistics";
-import PaymentHistory from "./child/PaymentHistory";
 import MonthlyExpenseBreakdown from "./child/MonthlyExpenseBreakdown";
-import QuickTransfer from "./child/QuickTransfer";
-import Investment from "./child/Investment";
-import PaymentHistoryOne from "./child/PaymentHistoryOne";
 import Swal from "sweetalert2";
+import { DashboardDataProvider } from "./DashboardDataProvider";
+import ForecastChart from "./child/ForecastChart";
 
 const DashBoardLayerEleven = () => {
   useEffect(() => {
@@ -26,48 +24,34 @@ const DashBoardLayerEleven = () => {
   }, []);
 
   return (
-    <div className="dashboard-container">
-      {/* Main Stats Section */}
-      <UnitCountEight />
+    <DashboardDataProvider>
+      <div className="dashboard-container">
+        {/* Main Stats Section */}
+        <UnitCountEight />
 
-      <div className='mt-24'>
-        <div className='row gy-4'>
-          {/* Main Content Area */}
-          <div className='col-xl-8'>
-            <div className='row gy-4'>
-              {/* Financial Overview */}
-              <BalanceStatistic />
-              
-              {/* Income Categories */}
-              <EarningCategories />
-              
-              {/* AI-Driven Expense Analysis */}
-              <ExpenseStatistics />
-              
-              {/* Recent Transactions */}
-              <PaymentHistory />
-              
-              {/* AI-Generated Monthly Analysis */}
-              <MonthlyExpenseBreakdown />
+        <div className='mt-24'>
+          <div className='row gy-4'>
+            {/* Main Content Area */}
+            <div className='col-xl-8'>
+              <div className='row gy-4'>
+                {/* Forecast and Prediction Cards */}
+                <ForecastChart />
+                {/* Financial Overview */}
+                <BalanceStatistic />
+              </div>
             </div>
-          </div>
-
-          {/* Sidebar */}
-          <div className='col-xl-4'>
-            <div className="sticky-sidebar">
-              {/* Quick Actions */}
-              <QuickTransfer />
-              
-              {/* Financial Planning */}
-              <Investment />
+            {/* Sidebar with small cards */}
+            <div className='col-xl-4'>
+              <div className="sticky-sidebar d-flex flex-column gap-4">
+                <MonthlyExpenseBreakdown />
+                <EarningCategories />
+                <ExpenseStatistics />
+              </div>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Detailed Transaction History */}
-      <PaymentHistoryOne />
-    </div>
+    </DashboardDataProvider>
   );
 };
 

@@ -34,6 +34,7 @@ import TestimonialsPage from "./pages/TestimonialsPage";
 import TermsConditionPage from "./pages/TermsConditionPage";
 import ViewProfilePage from "./pages/ViewProfilePage";
 import RouteScrollToTop from "./helper/RouteScrollToTop";
+import { DashboardDataProvider } from "./components/DashboardDataProvider";
 
 export const AuthContext = createContext(null);
 
@@ -126,32 +127,32 @@ function App() {
           <Route path="/terms-condition" element={<TermsConditionPage />} />
 
           {/* Protected Routes */}
-          <Route path="/dashboard" element={<ProtectedRoute><HomePageEleven /></ProtectedRoute>} />
-          <Route path="/calendar-main" element={<ProtectedRoute><CalendarMainPage /></ProtectedRoute>} />
-          <Route path="/calendar" element={<ProtectedRoute><CalendarMainPage /></ProtectedRoute>} />
-          <Route path="/code-generator-new" element={<ProtectedRoute><CodeGeneratorNewPage /></ProtectedRoute>} />
-          <Route path="/faq" element={<ProtectedRoute><FaqPage /></ProtectedRoute>} />
-          <Route path="/view-profile" element={<ProtectedRoute><ViewProfilePage /></ProtectedRoute>} />
-          <Route path="/form-layout" element={<ProtectedRoute><FormLayoutPage /></ProtectedRoute>} />
-          <Route path="/form-validation" element={<ProtectedRoute><FormValidationPage /></ProtectedRoute>} />
-          <Route path="/form" element={<ProtectedRoute><FormPage /></ProtectedRoute>} />
-          <Route path="/testimonials" element={<ProtectedRoute><TestimonialsPage /></ProtectedRoute>} />
-          <Route path="/coming-soon" element={<ProtectedRoute><ComingSoonPage /></ProtectedRoute>} />
-          <Route path="/access-denied" element={<ProtectedRoute><AccessDeniedPage /></ProtectedRoute>} />
-          <Route path="/maintenance" element={<ProtectedRoute><MaintenancePage /></ProtectedRoute>} />
-          <Route path="/blank-page" element={<ProtectedRoute><BlankPagePage /></ProtectedRoute>} />
-          <Route path="/line-chart" element={<ProtectedRoute><LineChartPage /></ProtectedRoute>} />
-          <Route path="/notification-alert" element={<ProtectedRoute><NotificationAlertPage /></ProtectedRoute>} />
-          <Route path="/notification" element={<ProtectedRoute><NotificationPage /></ProtectedRoute>} />
-          <Route path="/pagination" element={<ProtectedRoute><PaginationPage /></ProtectedRoute>} />
-          <Route path="/payment-gateway" element={<ProtectedRoute><PaymentGatewayPage /></ProtectedRoute>} />
-          <Route path="/pie-chart" element={<ProtectedRoute><PieChartPage /></ProtectedRoute>} />
-          <Route path="/column-chart" element={<ProtectedRoute><ColumnChartPage /></ProtectedRoute>} />
-          <Route path="/pricing" element={<ProtectedRoute><PricingPage /></ProtectedRoute>} />
-          <Route path="/star-rating" element={<ProtectedRoute><StarRatingPage /></ProtectedRoute>} />
-          <Route path="/switch" element={<ProtectedRoute><SwitchPage /></ProtectedRoute>} />
-          <Route path="/table-basic" element={<ProtectedRoute><TableBasicPage /></ProtectedRoute>} />
-          <Route path="/table-data" element={<ProtectedRoute><TableDataPage /></ProtectedRoute>} />
+          <Route path="/dashboard" element={<ProtectedRoute><DashboardDataProvider><HomePageEleven /></DashboardDataProvider></ProtectedRoute>} />
+          <Route path="/calendar-main" element={<ProtectedRoute><DashboardDataProvider><CalendarMainPage /></DashboardDataProvider></ProtectedRoute>} />
+          <Route path="/calendar" element={<ProtectedRoute><DashboardDataProvider><CalendarMainPage /></DashboardDataProvider></ProtectedRoute>} />
+          <Route path="/code-generator-new" element={<ProtectedRoute><DashboardDataProvider><CodeGeneratorNewPage /></DashboardDataProvider></ProtectedRoute>} />
+          <Route path="/faq" element={<ProtectedRoute><DashboardDataProvider><FaqPage /></DashboardDataProvider></ProtectedRoute>} />
+          <Route path="/view-profile" element={<ProtectedRoute><DashboardDataProvider><ViewProfilePage /></DashboardDataProvider></ProtectedRoute>} />
+          <Route path="/form-layout" element={<ProtectedRoute><DashboardDataProvider><FormLayoutPage /></DashboardDataProvider></ProtectedRoute>} />
+          <Route path="/form-validation" element={<ProtectedRoute><DashboardDataProvider><FormValidationPage /></DashboardDataProvider></ProtectedRoute>} />
+          <Route path="/form" element={<ProtectedRoute><DashboardDataProvider><FormPage /></DashboardDataProvider></ProtectedRoute>} />
+          <Route path="/testimonials" element={<ProtectedRoute><DashboardDataProvider><TestimonialsPage /></DashboardDataProvider></ProtectedRoute>} />
+          <Route path="/coming-soon" element={<ProtectedRoute><DashboardDataProvider><ComingSoonPage /></DashboardDataProvider></ProtectedRoute>} />
+          <Route path="/access-denied" element={<ProtectedRoute><DashboardDataProvider><AccessDeniedPage /></DashboardDataProvider></ProtectedRoute>} />
+          <Route path="/maintenance" element={<ProtectedRoute><DashboardDataProvider><MaintenancePage /></DashboardDataProvider></ProtectedRoute>} />
+          <Route path="/blank-page" element={<ProtectedRoute><DashboardDataProvider><BlankPagePage /></DashboardDataProvider></ProtectedRoute>} />
+          <Route path="/line-chart" element={<ProtectedRoute><DashboardDataProvider><LineChartPage /></DashboardDataProvider></ProtectedRoute>} />
+          <Route path="/notification-alert" element={<ProtectedRoute><DashboardDataProvider><NotificationAlertPage /></DashboardDataProvider></ProtectedRoute>} />
+          <Route path="/notification" element={<ProtectedRoute><DashboardDataProvider><NotificationPage /></DashboardDataProvider></ProtectedRoute>} />
+          <Route path="/pagination" element={<ProtectedRoute><DashboardDataProvider><PaginationPage /></DashboardDataProvider></ProtectedRoute>} />
+          <Route path="/payment-gateway" element={<ProtectedRoute><DashboardDataProvider><PaymentGatewayPage /></DashboardDataProvider></ProtectedRoute>} />
+          <Route path="/pie-chart" element={<ProtectedRoute><DashboardDataProvider><PieChartPage /></DashboardDataProvider></ProtectedRoute>} />
+          <Route path="/column-chart" element={<ProtectedRoute><DashboardDataProvider><ColumnChartPage /></DashboardDataProvider></ProtectedRoute>} />
+          <Route path="/pricing" element={<ProtectedRoute><DashboardDataProvider><PricingPage /></DashboardDataProvider></ProtectedRoute>} />
+          <Route path="/star-rating" element={<ProtectedRoute><DashboardDataProvider><StarRatingPage /></DashboardDataProvider></ProtectedRoute>} />
+          <Route path="/switch" element={<ProtectedRoute><DashboardDataProvider><SwitchPage /></DashboardDataProvider></ProtectedRoute>} />
+          <Route path="/table-basic" element={<ProtectedRoute><DashboardDataProvider><TableBasicPage /></DashboardDataProvider></ProtectedRoute>} />
+          <Route path="/table-data" element={<ProtectedRoute><DashboardDataProvider><TableDataPage /></DashboardDataProvider></ProtectedRoute>} />
 
           {/* Error Handling */}
           <Route path="*" element={<ErrorPage />} />

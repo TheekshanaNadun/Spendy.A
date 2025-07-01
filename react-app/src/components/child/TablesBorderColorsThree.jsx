@@ -41,6 +41,19 @@ const TransactionTable = () => {
         return `${hour % 12 || 12}:${minutes} ${hour >= 12 ? 'PM' : 'AM'}`;
     };
 
+    // Handler functions for actions
+    const handleEdit = (transaction) => {
+        // TODO: Open edit modal or navigate to edit page
+        alert(`Edit transaction #${transaction.transaction_id}`);
+    };
+
+    const handleDelete = (transactionId) => {
+        // TODO: Show confirmation and call API to delete
+        if (window.confirm('Are you sure you want to delete this transaction?')) {
+            alert(`Delete transaction #${transactionId}`);
+        }
+    };
+
     return (
         <div className="col-lg-12">
             <div className="card shadow-sm" style={{ borderColor: 'var(--border-color)' }}>

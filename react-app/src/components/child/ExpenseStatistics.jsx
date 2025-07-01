@@ -1,37 +1,71 @@
 import React from "react";
-import useReactApexChart from "../../hook/useReactApexChart";
 import ReactApexChart from "react-apexcharts";
+import { useDashboardData } from "../DashboardDataProvider";
 
 const ExpenseStatistics = () => {
-  let { expenseStatisticsOptions, expenseStatisticsSeries } =
-    useReactApexChart();
+  const { dashboardData, loading, error } = useDashboardData();
+
+  if (loading) return <div className="text-center py-4">Loading...</div>;
+  if (error) return <div className="text-danger">{error}</div>;
+  if (!dashboardData) return <div className="text-secondary">No data available.</div>;
+
+  const { expenseByCategory, expenseCategories } = dashboardData;
+
+  const chartOptions = {
+    chart: {
+      type: 'pie',
+      height: 340,
+      width: 340,
+    },
+    labels: expenseCategories,
+    colors: ["#02BCAF", "#F0437D", "#1C52F6", "#43DCFF", "#FF9F29", "#F26240"],
+    legend: {
+      show: true,
+      position: 'bottom',
+      fontSize: '12px',
+      labels: { useSeriesColors: false },
+      itemMargin: { horizontal: 8, vertical: 2 },
+    },
+    responsive: [
+      {
+        breakpoint: 480,
+        options: {
+          chart: {
+            width: 220,
+          },
+          legend: {
+            position: "bottom",
+          },
+        },
+      },
+    ],
+  };
+
   return (
-    <div className='col-md-6'>
-      <div className='card radius-16 h-100'>
+    <div className='w-100 sidebar-card'>
+      <div className='card radius-16 h-100 w-100'>
         <div className='card-header'>
           <div className='d-flex align-items-center flex-wrap gap-2 justify-content-between'>
             <h6 className='mb-2 fw-bold text-lg mb-0'>Expense Statistics</h6>
-            <select className='form-select form-select-sm w-auto bg-base border text-secondary-light'>
-              <option>Today</option>
-              <option>Weekly</option>
-              <option>Monthly</option>
-              <option>Yearly</option>
-            </select>
+            {/* The time period dropdown can be implemented later if needed */}
           </div>
         </div>
-        <div className='card-body'>
-          <div
-            id='expenseStatistics'
-            className='apexcharts-tooltip-z-none d-flex justify-content-center'
-          >
-            <ReactApexChart
-              options={expenseStatisticsOptions}
-              series={expenseStatisticsSeries}
-              type='pie'
-              height={540}
-              width={420}
-            />
-          </div>
+        <div className='card-body d-flex flex-column align-items-center justify-content-center' style={{ minWidth: 0 }}>
+          {expenseByCategory && expenseByCategory.length > 0 ? (
+            <div id='expenseStatistics' className='apexcharts-tooltip-z-none' style={{ width: '100%', minWidth: 0 }}>
+              <ReactApexChart
+                options={chartOptions}
+                series={expenseByCategory}
+                type='pie'
+                height={340}
+                width={340}
+              />
+            </div>
+          ) : (
+            <div className="text-center text-secondary-light">
+              No expense data to display.
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -39,3 +73,4 @@ const ExpenseStatistics = () => {
 };
 
 export default ExpenseStatistics;
+

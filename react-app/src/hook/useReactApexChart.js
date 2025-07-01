@@ -2053,10 +2053,6 @@ const useReactApexChart = () => {
       name: "Revenue",
       data: [90, 140, 80, 125, 70, 140, 110],
     },
-    {
-      name: "Free Cash",
-      data: [60, 120, 60, 90, 50, 95, 90],
-    },
   ];
   let paymentStatusChartOptionsTwo = {
     colors: ["#45B369", "#144bd6", "#FF9F29"],
@@ -2087,30 +2083,41 @@ const useReactApexChart = () => {
     dataLabels: {
       enabled: false,
     },
-    states: {
-      hover: {
-        filter: {
-          type: "none",
-        },
-      },
-    },
     stroke: {
       show: true,
-      width: 0,
+      width: 2,
       colors: ["transparent"],
     },
     xaxis: {
-      categories: ["Mon", "Tues", "Wed", "Thurs", "Fri", "Sat", "Sun"],
+      categories: [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+      ],
     },
     yaxis: {
       categories: [
         "0",
+        "5000",
         "10,000",
         "20,000",
         "30,000",
         "50,000",
-        "1,00,000",
-        "1,00,000",
+        "60,000",
+        "60,000",
+        "70,000",
+        "80,000",
+        "90,000",
+        "100,000",
       ],
     },
     fill: {
@@ -5444,10 +5451,27 @@ const useReactApexChart = () => {
   let expenseStatisticsSeries = [30, 30, 30, 30];
 
   return {
-    expenseStatisticsOptions,
-    expenseStatisticsSeries,
-    balanceStatisticsOptions,
-    balanceStatisticsSeries,
+    expenseStatisticsOptions: {
+      chart: { type: 'pie', height: 240 },
+      labels: [],
+      colors: [],
+      legend: { show: true },
+      responsive: [{ breakpoint: 480, options: { chart: { width: 200 }, legend: { position: 'bottom' } } }],
+    },
+    expenseStatisticsSeries: [],
+    balanceStatisticsOptions: {
+      chart: { type: 'bar', height: 250, toolbar: { show: false } },
+      plotOptions: { bar: { horizontal: false, columnWidth: '55%', endingShape: 'rounded' } },
+      dataLabels: { enabled: false },
+      stroke: { show: true, width: 2, colors: ['transparent'] },
+      xaxis: { categories: [] },
+      yaxis: { title: { text: '' }, labels: { formatter: (val) => val } },
+      fill: { opacity: 1 },
+      tooltip: { y: { formatter: (val) => val } },
+      colors: [],
+      grid: { borderColor: '#f1f1f1' },
+    },
+    balanceStatisticsSeries: [],
     purchaseSaleChartOptions,
     purchaseSaleChartSeries,
     userOverviewDonutChartOptionsTwo,

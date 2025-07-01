@@ -12,7 +12,7 @@ const BasicPieChart = () => {
                     <h6 className="text-lg fw-semibold mb-0">Basic Pie Chart</h6>
                 </div>
                 <div className="card-body p-24 text-center">
-                    <ReactApexChart id="pieChart" className="d-flex justify-content-center" options={pieChartOptionsTwo} series={pieChartSeriesOne} type="pie"
+                    <ReactApexChart id="pieChart" className="d-flex justify-content-center" options={pieChartOptionsTwo} series={pieChartSeriesOne || []} type="pie"
                         height={264} width={380} />
                 </div>
             </div>

@@ -1,6 +1,5 @@
 from flask import Flask,session , jsonify, request,redirect
 from flask_session import Session
-from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from flask_cors import CORS
@@ -9,20 +8,35 @@ from flask_limiter.util import get_remote_address
 from datetime import timedelta, datetime
 import hashlib
 import random
-from sqlalchemy import extract, func, ForeignKey
+from sqlalchemy import extract, func
 from sqlalchemy.exc import SQLAlchemyError
 import os
 import time
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from flask_cors import cross_origin
 from dotenv import load_dotenv
 from flask_mail import Mail, Message
+from calendar import month_name, monthrange
+import logging
+from dateutil.relativedelta import relativedelta
+import pandas as pd
+from ai_model import arima_forecast
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+from statsmodels.tsa.arima.model import ARIMA
+
+# Import the centralized db instance and models
+from models import db, User, Transaction, Category, UserCategoryLimit
 
 load_dotenv()
 
 # Initialize Flask app
 app = Flask(__name__)
+# Ensure Flask logs INFO and above to the console
+app.logger.setLevel(logging.INFO)
+if not app.logger.handlers:
+    handler = logging.StreamHandler()
+    handler.setLevel(logging.INFO)
+    app.logger.addHandler(handler)
 app.secret_key = os.getenv("SECRET_KEY")
 OTP_EXPIRY = 300  # 5 minutes
 
@@ -31,7 +45,7 @@ OTP_EXPIRY = 300  # 5 minutes
 limiter = Limiter(
     app=app,
     key_func=get_remote_address,
-    default_limits=["500 per day", "100 per hour"]
+    default_limits=["1000 per hour", "100 per minute"]
 )
 # Configure Flask-Session
 app.config.update(
@@ -56,7 +70,7 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
 }
 
 # Initialize extensions
-db = SQLAlchemy(app)
+db.init_app(app)
 
 # Configure CORS
 CORS(app, 
@@ -66,67 +80,6 @@ CORS(app,
          "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
          "allow_headers": ["Content-Type", "Authorization"]
      }})
-
-# Database Models
-class User(db.Model):
-    __tablename__ = 'users'
-    user_id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(255), unique=True, nullable=False)
-    email = db.Column(db.String(255), unique=True, nullable=False)
-    password_hash = db.Column(db.String(255), nullable=False)
-    monthly_limit = db.Column(db.Integer, default=0)
-    profile_image = db.Column(db.LargeBinary)
-    
-    transactions = db.relationship('Transaction', back_populates='user')
-    category_limits = db.relationship('UserCategoryLimit', back_populates='user')
-
-class Transaction(db.Model):
-    __tablename__ = 'transactions'
-    transaction_id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, ForeignKey('users.user_id'), nullable=False)
-    category = db.Column(db.String(100), ForeignKey('categories.name'))
-    type = db.Column(db.String(50), nullable=False)
-    item = db.Column(db.String(255))
-    price = db.Column(db.Integer)
-    date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
-    location = db.Column(db.String(255))
-    timestamp = db.Column(db.Time)
-    latitude = db.Column(db.Float)
-    longitude = db.Column(db.Float)
-    
-    user = db.relationship('User', back_populates='transactions')
-    category_rel = db.relationship('Category', back_populates='transactions')
-__table_args__ = {
-        'implicit_returning': False  # Set per-table in __table_args__
-    }
-
-
-class Category(db.Model):
-    __tablename__ = 'categories'
-    category_id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
-    type = db.Column(db.String(20), nullable=False)
-    
-    transactions = db.relationship('Transaction', back_populates='category_rel')
-    limits = db.relationship('UserCategoryLimit', back_populates='category')
-    
-    __table_args__ = (
-        db.CheckConstraint("type IN ('Income', 'Expense')", name='check_category_type'),
-    )
-
-class UserCategoryLimit(db.Model):
-    __tablename__ = 'user_category_limits'
-    limit_id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, ForeignKey('users.user_id'), nullable=False)
-    category_id = db.Column(db.Integer, ForeignKey('categories.category_id'), nullable=False)
-    monthly_limit = db.Column(db.Numeric(10, 2), nullable=False)
-    
-    user = db.relationship('User', back_populates='category_limits')
-    category = db.relationship('Category', back_populates='limits')
-    
-    __table_args__ = (
-        db.UniqueConstraint('user_id', 'category_id', name='_user_category_uc'),
-    )
 
 def require_login(f):
     @wraps(f)
@@ -354,10 +307,12 @@ def verify_otp():
 
 
 @app.route('/api/session-check', methods=['GET'])
-@limiter.limit("100/hour")
 def session_check():
     if 'user_id' in session and session.get('logged_in'):
         user = User.query.get(session['user_id'])
+        if not user:
+            session.clear()
+            return jsonify({"authenticated": False}), 401
         return jsonify({
             "authenticated": True,
             "user": {
@@ -374,10 +329,9 @@ def session_check():
 
 
 @app.route('/api/logout', methods=['POST'])
-@cross_origin(origins=["http://localhost:3000"], supports_credentials=True)
 def logout():
     session.clear()
-    return redirect('http://localhost:3000/', code=302)
+    return jsonify({"message": "Logged out successfully"}), 200
 
 
 
@@ -570,39 +524,25 @@ def create_transaction():
             db.session.add(category)
             db.session.flush()
 
-        # First, execute the INSERT
-        insert_stmt = text("""
-            INSERT INTO transactions 
-            (user_id, category, type, item, price, date, location, timestamp, latitude, longitude)
-            VALUES 
-            (:user_id, :category, :type, :item, :price, :date, :location, :timestamp, :latitude, :longitude)
-        """)
-
-        db.session.execute(
-            insert_stmt,
-            {
-                'user_id': session['user_id'],
-                'category': data['category'],
-                'type': data['type'],
-                'item': data['item'],
-                'price': int(data['price']),
-                'date': datetime.strptime(data['date'], '%Y-%m-%d').date(),
-                'location': data.get('location'),
-                'timestamp': datetime.now().time(),
-                'latitude': data.get('latitude'),
-                'longitude': data.get('longitude')
-            }
+        # Use ORM to create the transaction
+        new_transaction = Transaction(
+            user_id=session['user_id'],
+            category=data['category'],
+            type=data['type'],
+            item=data['item'],
+            price=int(data['price']),
+            date=datetime.strptime(data['date'], '%Y-%m-%d').date(),
+            location=data.get('location'),
+            timestamp=datetime.now().time(),
+            latitude=data.get('latitude'),
+            longitude=data.get('longitude')
         )
-
-        # Then get the last inserted ID
-        result = db.session.execute(text("SELECT IDENT_CURRENT('transactions') AS transaction_id"))
-        transaction_id = result.scalar()
-        
+        db.session.add(new_transaction)
         db.session.commit()
 
         return jsonify({
             "message": "Transaction created successfully",
-            "transaction_id": int(transaction_id)
+            "transaction_id": int(new_transaction.transaction_id)
         }), 201
 
     except SQLAlchemyError as e:
@@ -693,25 +633,18 @@ def manage_transaction(transaction_id):
             db.session.rollback()
             return jsonify({"error": "Failed to delete transaction"}), 500
 
-@app.after_request
-def add_cors_headers(response):
-    origin = request.headers.get('Origin')
-    allowed_origins = ['http://localhost', 'http://localhost:80', 'http://localhost:3000']
-    if origin in allowed_origins:
-        response.headers['Access-Control-Allow-Origin'] = origin
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
-    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, PATCH, OPTIONS'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
-    return response
-
 @app.route('/api/transactions/expense', methods=['GET'])
 @require_login
 def get_expense_transactions():
     try:
         user_id = session['user_id']
-        transactions = Transaction.query.filter_by(
-            user_id=user_id,
-            type='Expense'
+        today = datetime.utcnow().date()
+        first_day_of_month = today.replace(day=1)
+        transactions = Transaction.query.filter(
+            Transaction.user_id == user_id,
+            Transaction.type == 'Expense',
+            Transaction.date >= first_day_of_month,
+            Transaction.date <= today
         ).options(db.joinedload(Transaction.category_rel)).order_by(Transaction.date.desc()).all()
 
         return jsonify([{
@@ -767,81 +700,329 @@ def get_income_transactions():
 def get_financial_stats():
     try:
         user_id = session['user_id']
-        current_date = datetime.now()
-        
-        # Calculate date ranges
-        current_month_start = current_date.replace(day=1)
-        last_month_end = current_month_start - timedelta(days=1)
-        last_month_start = last_month_end.replace(day=1)
+        today = datetime.utcnow().date()
 
-        # Income calculations
+        # This month's range
+        first_day_current_month = today.replace(day=1)
+        if first_day_current_month.month == 12:
+            first_day_next_month = first_day_current_month.replace(year=today.year + 1, month=1)
+        else:
+            first_day_next_month = first_day_current_month.replace(month=today.month + 1)
+
+        # Last month's range
+        first_day_last_month = (first_day_current_month - timedelta(days=1)).replace(day=1)
+
+        # Current month income
         current_month_income = db.session.query(
             func.coalesce(func.sum(Transaction.price), 0)
         ).filter(
             Transaction.user_id == user_id,
             Transaction.type == 'Income',
-            extract('year', Transaction.date) == current_date.year,
-            extract('month', Transaction.date) == current_date.month
+            Transaction.date >= first_day_current_month,
+            Transaction.date < first_day_next_month
         ).scalar()
 
+        # Last month income
         last_month_income = db.session.query(
             func.coalesce(func.sum(Transaction.price), 0)
         ).filter(
             Transaction.user_id == user_id,
             Transaction.type == 'Income',
-            extract('year', Transaction.date) == last_month_start.year,
-            extract('month', Transaction.date) == last_month_start.month
+            Transaction.date >= first_day_last_month,
+            Transaction.date < first_day_current_month
         ).scalar()
 
-        # Expense calculations
+        # Current month expense
         current_month_expense = db.session.query(
             func.coalesce(func.sum(Transaction.price), 0)
         ).filter(
             Transaction.user_id == user_id,
             Transaction.type == 'Expense',
-            extract('year', Transaction.date) == current_date.year,
-            extract('month', Transaction.date) == current_date.month
+            Transaction.date >= first_day_current_month,
+            Transaction.date < first_day_next_month
         ).scalar()
 
+        # Last month expense
         last_month_expense = db.session.query(
             func.coalesce(func.sum(Transaction.price), 0)
         ).filter(
             Transaction.user_id == user_id,
             Transaction.type == 'Expense',
-            extract('year', Transaction.date) == last_month_start.year,
-            extract('month', Transaction.date) == last_month_start.month
+            Transaction.date >= first_day_last_month,
+            Transaction.date < first_day_current_month
         ).scalar()
 
-        # Net profit calculation
+        # Total savings
+        total_income = db.session.query(func.coalesce(func.sum(Transaction.price), 0)).filter(Transaction.user_id == user_id, Transaction.type == 'Income').scalar()
+        total_expense = db.session.query(func.coalesce(func.sum(Transaction.price), 0)).filter(Transaction.user_id == user_id, Transaction.type == 'Expense').scalar()
+        total_savings = total_income - total_expense
+
         net_profit = current_month_income - current_month_expense
 
-        # Total savings (assuming savings is cumulative)
-        total_savings = db.session.query(
-            func.coalesce(func.sum(Transaction.price), 0)
-        ).filter(
+        # Debug: Log all transactions for the current user in the current month
+        debug_transactions = Transaction.query.filter(
             Transaction.user_id == user_id,
-            Transaction.type == 'Income'
-        ).scalar() - db.session.query(
-            func.coalesce(func.sum(Transaction.price), 0)
-        ).filter(
-            Transaction.user_id == user_id,
-            Transaction.type == 'Expense'
-        ).scalar()
+            Transaction.date >= first_day_current_month,
+            Transaction.date < first_day_next_month
+        ).all()
+        app.logger.info(f"Current month transactions for user {user_id}:")
+        for t in debug_transactions:
+            app.logger.info(f"ID: {t.transaction_id}, Type: {t.type}, Date: {t.date}, Price: {t.price}, Item: {t.item}")
 
-        return jsonify({
-            'currentMonthIncome': current_month_income,
-            'lastMonthIncome': last_month_income,
-            'currentMonthExpense': current_month_expense,
-            'lastMonthExpense': last_month_expense,
-            'netProfit': net_profit,
-            'totalSavings': total_savings
-        }), 200
+        return jsonify([
+            {
+                'type': 'Income',
+                'total': float(current_month_income),
+                'period': 'currentMonth'
+            },
+            {
+                'type': 'Income',
+                'total': float(last_month_income),
+                'period': 'lastMonth'
+            },
+            {
+                'type': 'Expense',
+                'total': float(current_month_expense),
+                'period': 'currentMonth'
+            },
+            {
+                'type': 'Expense',
+                'total': float(last_month_expense),
+                'period': 'lastMonth'
+            },
+            {
+                'type': 'Income',
+                'total': float(total_income),
+                'period': 'total'
+            },
+            {
+                'type': 'Expense',
+                'total': float(total_expense),
+                'period': 'total'
+            },
+            {
+                'type': 'NetProfit',
+                'total': float(net_profit),
+                'period': 'currentMonth'
+            },
+            {
+                'type': 'Savings',
+                'total': float(total_savings),
+                'period': 'total'
+            }
+        ]), 200
 
     except Exception as e:
         app.logger.error(f"Error fetching stats: {str(e)}")
         return jsonify({"error": "Error retrieving statistics"}), 500
 
 
+@app.route('/api/expense-summary', methods=['GET'])
+@require_login
+def get_expense_summary():
+    try:
+        user_id = session['user_id']
+        
+        # Query to sum expenses by category for the current user
+        expense_summary = db.session.query(
+            Category.name,
+            func.sum(Transaction.price).label('total_expenses')
+        ).join(Transaction, Category.name == Transaction.category)\
+         .filter(Transaction.user_id == user_id, Transaction.type == 'Expense')\
+         .group_by(Category.name)\
+         .order_by(func.sum(Transaction.price).desc())\
+         .all()
+
+        # Format the data for the frontend (e.g., for a pie chart)
+        chart_data = {
+            'labels': [row.name for row in expense_summary],
+            'series': [float(row.total_expenses) for row in expense_summary]
+        }
+        
+        return jsonify(chart_data), 200
+
+    except Exception as e:
+        app.logger.error(f"Error fetching expense summary: {str(e)}")
+        return jsonify({"error": "Error retrieving expense summary"}), 500
+
+@app.route('/api/dashboard-data', methods=['GET'])
+@require_login
+def dashboard_data():
+    try:
+        user_id = session['user_id']
+        today = datetime.utcnow().date()
+        # Get the first day of this month
+        first_month = today.replace(day=1)
+        # Get the first day 12 months ago
+        if first_month.month == 12:
+            first_month_last_year = first_month.replace(year=first_month.year-1, month=1)
+        else:
+            first_month_last_year = (first_month.replace(month=first_month.month-11) if first_month.month > 11 else first_month.replace(year=first_month.year-1, month=first_month.month+1))
+
+        # Prepare months list (oldest to newest)
+        months = []
+        month_labels = []
+        month_lookup = []
+        current = first_month
+        for i in range(12):
+            month_date = current - relativedelta(months=11 - i)
+            year = month_date.year
+            month = month_date.month
+            label = f"{month_name[month][:3]} {year}"
+            months.append((year, month))
+            month_labels.append(label)
+            month_lookup.append((year, month))
+
+        # Find the last month/year in your dashboard range
+        from calendar import monthrange
+        last_year, last_month = months[-1]
+        last_day = monthrange(last_year, last_month)[1]
+        last_date = datetime(last_year, last_month, last_day).date()
+
+        # Fetch all transactions for the user in the dashboard range (up to last day of latest month)
+        transactions = Transaction.query.filter(
+            Transaction.user_id == user_id,
+            Transaction.date >= first_month_last_year,
+            Transaction.date <= last_date
+        ).all()
+
+        # Aggregate monthly income and expense
+        monthly_income = [0 for _ in range(12)]
+        monthly_expense = [0 for _ in range(12)]
+        net_profit = [0 for _ in range(12)]
+        for t in transactions:
+            t_year = t.date.year
+            t_month = t.date.month
+            if (t_year, t_month) in month_lookup:
+                idx = month_lookup.index((t_year, t_month))
+                if t.type == 'Income':
+                    monthly_income[idx] += t.price
+                elif t.type == 'Expense':
+                    monthly_expense[idx] += t.price
+        for i in range(12):
+            net_profit[i] = monthly_income[i] - monthly_expense[i]
+
+        # Only use current month for category breakdowns (1st to last day)
+        current_year, current_month = months[-1]
+        expense_by_category = {}
+        income_by_category = {}
+        for t in transactions:
+            if (
+                t.date.year == current_year and
+                t.date.month == current_month
+            ):
+                if t.type == 'Expense':
+                    expense_by_category[t.category] = expense_by_category.get(t.category, 0) + t.price
+                elif t.type == 'Income':
+                    income_by_category[t.category] = income_by_category.get(t.category, 0) + t.price
+
+        # Calculate currentMonthIncome and currentMonthExpense for full month
+        currentMonthIncome = sum(
+            t.price for t in transactions
+            if t.type == 'Income' and t.date.year == current_year and t.date.month == current_month
+        )
+        currentMonthExpense = sum(
+            t.price for t in transactions
+            if t.type == 'Expense' and t.date.year == current_year and t.date.month == current_month
+        )
+
+        # Map data
+        map_points = [
+            {
+                'lat': float(t.latitude),
+                'lng': float(t.longitude),
+                'amount': float(t.price),
+                'type': t.type
+            }
+            for t in transactions if t.latitude is not None and t.longitude is not None
+        ]
+
+        # Add summary fields for widgets
+        lastMonthIncome = monthly_income[-2] if len(monthly_income) > 1 else 0
+        lastMonthExpense = monthly_expense[-2] if len(monthly_expense) > 1 else 0
+        currentNetProfit = net_profit[-1] if net_profit else 0
+        totalSavings = sum(monthly_income) - sum(monthly_expense)
+
+        return jsonify({
+            'months': month_labels,
+            'monthlyIncome': monthly_income,
+            'monthlyExpense': monthly_expense,
+            'netProfit': net_profit,
+            'expenseCategories': list(expense_by_category.keys()),
+            'expenseByCategory': list(expense_by_category.values()),
+            'incomeCategories': list(income_by_category.keys()),
+            'incomeByCategory': list(income_by_category.values()),
+            'mapData': map_points,
+            'currentMonthIncome': currentMonthIncome,
+            'lastMonthIncome': lastMonthIncome,
+            'currentMonthExpense': currentMonthExpense,
+            'lastMonthExpense': lastMonthExpense,
+            'netProfitCurrent': currentNetProfit,
+            'totalSavings': totalSavings
+        }), 200
+    except Exception as e:
+        import traceback
+        app.logger.error(f"Error fetching dashboard data: {str(e)}")
+        app.logger.error(traceback.format_exc())
+        return jsonify({'error': 'Error retrieving dashboard data', 'details': str(e)}), 500
+
+@app.route('/api/predict', methods=['GET'])
+@require_login
+def predict_next_month():
+    try:
+        user_id = session['user_id']
+        # Fetch all transactions for the user
+        transactions = Transaction.query.filter_by(user_id=user_id).all()
+        if not transactions:
+            return jsonify({"error": "No transactions found for user."}), 404
+
+        # Build DataFrame
+        data = [{
+            'date': t.date,
+            'type': t.type,
+            'price': float(t.price) if t.price is not None else 0.0
+        } for t in transactions]
+        df = pd.DataFrame(data)
+        df['date'] = pd.to_datetime(df['date'])
+
+        # Aggregate daily totals
+        expense_df = df[df['type'] == 'Expense'].groupby('date').sum(numeric_only=True).reindex(pd.date_range(df['date'].min(), df['date'].max()), fill_value=0)
+        income_df = df[df['type'] == 'Income'].groupby('date').sum(numeric_only=True).reindex(pd.date_range(df['date'].min(), df['date'].max()), fill_value=0)
+
+        # --- Accuracy metrics for Expense ---
+        def get_arima_accuracy(series):
+            if len(series) < 40:
+                return None  # Not enough data for train/test split
+            train = series.iloc[:-30]
+            test = series.iloc[-30:]
+            try:
+                model = ARIMA(train, order=(1,1,1))
+                model_fit = model.fit()
+                forecast = model_fit.forecast(steps=30)
+                mae = mean_absolute_error(test, forecast)
+                rmse = mean_squared_error(test, forecast, squared=False)
+                mape = (abs((test - forecast) / test.replace(0, 1))).mean() * 100
+                return {'mae': float(mae), 'rmse': float(rmse), 'mape': float(mape)}
+            except Exception:
+                return None
+
+        expense_accuracy = get_arima_accuracy(expense_df['price'])
+        income_accuracy = get_arima_accuracy(income_df['price'])
+
+        expense_forecast = arima_forecast(expense_df['price'])
+        income_forecast = arima_forecast(income_df['price'])
+        future_dates = pd.date_range(df['date'].max() + pd.Timedelta(days=1), periods=30).strftime('%Y-%m-%d').tolist()
+
+        return jsonify({
+            'expense': expense_forecast,
+            'income': income_forecast,
+            'dates': future_dates,
+            'expense_accuracy': expense_accuracy,
+            'income_accuracy': income_accuracy
+        })
+    except Exception as e:
+        app.logger.error(f"Prediction error: {str(e)}")
+        return jsonify({"error": "Prediction failed."}), 500
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
