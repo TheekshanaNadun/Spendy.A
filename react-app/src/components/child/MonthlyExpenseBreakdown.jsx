@@ -50,7 +50,7 @@ const MonthlyExpenseBreakdown = () => {
                     <span className='text-secondary-light text-truncate' style={{ maxWidth: 120, overflowWrap: 'break-word', wordBreak: 'break-all' }}>{cat}</span>
                   </div>
                   <div className='d-flex align-items-center gap-2' style={{ minWidth: 0 }}>
-                    <span className='text-secondary-light'>${amount.toLocaleString()}</span>
+                    <span className='text-secondary-light'>LKR {amount.toLocaleString()}</span>
                     <span className='text-primary-light fw-semibold'>{percent}%</span>
                   </div>
                 </div>
