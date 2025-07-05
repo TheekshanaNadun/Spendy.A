@@ -35,11 +35,11 @@ load_dotenv()
 
 # Initialize Flask app
 app = Flask(__name__)
-# Ensure Flask logs INFO and above to the console
-app.logger.setLevel(logging.INFO)
+# Ensure Flask logs WARNING and above to the console
+app.logger.setLevel(logging.WARNING)
 if not app.logger.handlers:
     handler = logging.StreamHandler()
-    handler.setLevel(logging.INFO)
+    handler.setLevel(logging.WARNING)
     app.logger.addHandler(handler)
 app.secret_key = os.getenv("SECRET_KEY")
 OTP_EXPIRY = 300  # 5 minutes
@@ -1111,4 +1111,4 @@ def predict_next_month():
         return jsonify({"error": "Prediction failed."}), 500
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(debug=False, host="0.0.0.0", port=5000)

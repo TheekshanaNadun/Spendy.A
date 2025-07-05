@@ -36,7 +36,7 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'execution_options': {'isolation_level': 'READ COMMITTED'}
 }
 # Configure logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 # CORS Configuration
