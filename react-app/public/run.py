@@ -800,103 +800,81 @@ def process_message():
         if not message or not message.strip():
             return jsonify({"error": "Message is required"}), 400
 
-        # Classify message type
-        message_type = classify_message_type(message)
-        logger.info(f"Message classified as: {message_type}")
-
         # Get Sri Lankan market insights
         market_insights = get_sri_lankan_market_insights(user_id)
 
-        if message_type == 'question':
-            # Handle questions with AI advisor
-            kluster_response = call_kluster_api(message, message_type='question')
-            if not kluster_response:
-                return jsonify({"error": "Failed to process question"}), 500
+        # Always treat as transaction
+        user_context = analyze_user_patterns(user_id)
+        smart_suggestions = get_smart_suggestions(user_id, message)
 
-            parsed_response = parse_kluster_response(kluster_response, message_type='question')
-            if not parsed_response:
-                return jsonify({"error": "Failed to parse question response"}), 500
+        # Enhanced AI processing with user context
+        kluster_response = call_kluster_api(message, user_context, message_type='transaction')
+        if not kluster_response:
+            return jsonify({"error": "Failed to process transaction"}), 500
 
-            return jsonify({
-                "status": "success",
-                "message_type": "question",
-                "ai_response": parsed_response['content'],
-                "market_insights": market_insights,  # Only include market insights for questions
-                "user_confidence": None  # No confidence needed for questions
-            })
+        parsed_response = parse_kluster_response(kluster_response, message_type='transaction')
+        if not parsed_response:
+            return jsonify({"error": "Failed to parse transaction response"}), 500
 
-        else:
-            # Handle transactions
-            user_context = analyze_user_patterns(user_id)
-            smart_suggestions = get_smart_suggestions(user_id, message)
+        structured_data = parsed_response['data']
 
-            # Enhanced AI processing with user context
-            kluster_response = call_kluster_api(message, user_context, message_type='transaction')
-            if not kluster_response:
-                return jsonify({"error": "Failed to process transaction"}), 500
-
-            parsed_response = parse_kluster_response(kluster_response, message_type='transaction')
-            if not parsed_response:
-                return jsonify({"error": "Failed to parse transaction response"}), 500
-
-            structured_data = parsed_response['data']
-
-            # Ensure type is either 'Income' or 'Expense' (case-insensitive)
-            valid_types = ['Income', 'Expense']
-            if 'type' in structured_data and structured_data['type']:
-                type_value = str(structured_data['type']).capitalize()
-                if type_value not in valid_types:
-                    # Try to infer from category
-                    income_categories = [
-                        'Salary', 'Foreign Remittances', 'Rental Income', 'Agricultural Income', 'Business Profits',
-                        'Investment Returns', 'Government Allowances', 'Freelance Income'
-                    ]
-                    if 'category' in structured_data and structured_data['category']:
-                        if structured_data['category'] in income_categories:
-                            type_value = 'Income'
-                        else:
-                            type_value = 'Expense'
+        # Ensure type is either 'Income' or 'Expense' (case-insensitive)
+        valid_types = ['Income', 'Expense']
+        if 'type' in structured_data and structured_data['type']:
+            type_value = str(structured_data['type']).capitalize()
+            if type_value not in valid_types:
+                # Try to infer from category
+                income_categories = [
+                    'Salary', 'Foreign Remittances', 'Rental Income', 'Agricultural Income', 'Business Profits',
+                    'Investment Returns', 'Government Allowances', 'Freelance Income'
+                ]
+                if 'category' in structured_data and structured_data['category']:
+                    if structured_data['category'] in income_categories:
+                        type_value = 'Income'
                     else:
-                        return jsonify({"error": "Transaction type must be either 'Income' or 'Expense'"}), 400
-                structured_data['type'] = type_value
-            else:
-                return jsonify({"error": "Transaction type is missing in the response"}), 400
+                        type_value = 'Expense'
+                else:
+                    return jsonify({"error": "Transaction type must be either 'Income' or 'Expense'"}), 400
+            structured_data['type'] = type_value
+        else:
+            return jsonify({"error": "Transaction type is missing in the response"}), 400
 
-            structured_data["user_id"] = user_id
-            structured_data["latitude"] = request.json.get('latitude')
-            structured_data["longitude"] = request.json.get('longitude')
+        structured_data["user_id"] = user_id
+        structured_data["latitude"] = request.json.get('latitude')
+        structured_data["longitude"] = request.json.get('longitude')
 
-            # If location is missing, fetch from last transaction
-            if not structured_data.get('location'):
-                last_tx = Transaction.query.filter_by(user_id=user_id).order_by(Transaction.date.desc(), Transaction.timestamp.desc()).first()
-                if last_tx and last_tx.location:
-                    structured_data['location'] = last_tx.location
+        # If location is missing, fetch from last transaction
+        if not structured_data.get('location'):
+            last_tx = Transaction.query.filter_by(user_id=user_id).order_by(Transaction.date.desc(), Transaction.timestamp.desc()).first()
+            if last_tx and last_tx.location:
+                structured_data['location'] = last_tx.location
 
-            # If date is missing, set to today
-            if not structured_data.get('date'):
-                structured_data['date'] = datetime.now().strftime('%Y-%m-%d')
+        # If date is missing, set to today
+        if not structured_data.get('date'):
+            structured_data['date'] = datetime.now().strftime('%Y-%m-%d')
 
-            # Generate insights and recommendations (without saving to database yet)
-            insights = generate_transaction_insights(user_id, structured_data, user_context)
-            
-            # Check for budget alerts
-            budget_alerts = check_budget_alerts(user_id, [structured_data.get('category')], structured_data.get('price'))
-            
-            # Get transaction-specific insights
-            transaction_insights = get_transaction_insights(user_id, structured_data)
+        # Generate insights and recommendations (without saving to database yet)
+        insights = generate_transaction_insights(user_id, structured_data, user_context)
+        
+        # Check for budget alerts
+        budget_alerts = check_budget_alerts(user_id, [structured_data.get('category')], structured_data.get('price'))
+        
+        # Get transaction-specific insights
+        transaction_insights = get_transaction_insights(user_id, structured_data)
 
-            return jsonify({
-                "status": "success",
-                "message_type": "transaction",
-                "message": "Transaction processed successfully. Review and confirm to save.",
-                "structured_data": structured_data,
-                "insights": insights,
-                "suggestions": smart_suggestions,
-                "budget_alerts": budget_alerts,
-                "transaction_insights": transaction_insights,
-                "ai_suggestions": structured_data.get('suggestions', []),
-                "user_confidence": None  # Will be set by user in frontend
-            })
+        return jsonify({
+            "status": "success",
+            "message_type": "transaction",
+            "message": "Transaction processed successfully. Review and confirm to save.",
+            "structured_data": structured_data,
+            "insights": insights,
+            "suggestions": smart_suggestions,
+            "budget_alerts": budget_alerts,
+            "transaction_insights": transaction_insights,
+            "ai_suggestions": structured_data.get('suggestions', []),
+            "user_confidence": None,  # Will be set by user in frontend
+            "market_insights": market_insights
+        })
 
     except Exception as e:
         logger.error(f"Error processing message: {str(e)}")

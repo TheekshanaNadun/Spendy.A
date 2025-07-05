@@ -20,9 +20,8 @@ from calendar import month_name, monthrange
 import logging
 from dateutil.relativedelta import relativedelta
 import pandas as pd
-from ai_model import arima_forecast
-from sklearn.metrics import mean_absolute_error, mean_squared_error
-from statsmodels.tsa.arima.model import ARIMA
+from prophet import Prophet
+import numpy as np
 
 # Import the centralized db instance and models
 from models import db, User, Transaction, Category, UserCategoryLimit
@@ -1044,39 +1043,61 @@ def predict_next_month():
         df = pd.DataFrame(data)
         df['date'] = pd.to_datetime(df['date'])
 
-        # Aggregate daily totals
-        expense_df = df[df['type'] == 'Expense'].groupby('date').sum(numeric_only=True).reindex(pd.date_range(df['date'].min(), df['date'].max()), fill_value=0)
-        income_df = df[df['type'] == 'Income'].groupby('date').sum(numeric_only=True).reindex(pd.date_range(df['date'].min(), df['date'].max()), fill_value=0)
+        # Prepare Prophet DataFrames
+        def prepare_prophet_df(df, ttype):
+            dff = df[df['type'] == ttype].groupby('date').sum(numeric_only=True).reset_index()
+            dff = dff.rename(columns={'date': 'ds', 'price': 'y'})
+            return dff
 
-        # --- Accuracy metrics for Expense ---
-        def get_arima_accuracy(series):
-            if len(series) < 40:
-                app.logger.error(f'ARIMA accuracy error: Not enough data points (len={len(series)})')
-                print(f'ARIMA accuracy error: Not enough data points (len={len(series)})')
-                return None  # Not enough data for train/test split
-            train = series.iloc[:-30]
-            test = series.iloc[-30:]
-            try:
-                app.logger.info(f'ARIMA fitting: train len={len(train)}, test len={len(test)}, train sample={train.head(3).tolist()}...')
-                print(f'ARIMA fitting: train len={len(train)}, test len={len(test)}, train sample={train.head(3).tolist()}...')
-                model = ARIMA(train, order=(1,1,1))
-                model_fit = model.fit()
-                forecast = model_fit.forecast(steps=30)
-                mae = mean_absolute_error(test, forecast)
-                rmse = mean_squared_error(test, forecast) ** 0.5  # Manual sqrt for RMSE
-                mape = (abs((test - forecast) / test.replace(0, 1))).mean() * 100
-                return {'mae': float(mae), 'rmse': float(rmse), 'mape': float(mape)}
-            except Exception as e:
-                app.logger.error(f'ARIMA accuracy error: {e}')
-                print(f'ARIMA accuracy error: {e}')
-                return None
+        expense_df = prepare_prophet_df(df, 'Expense')
+        income_df = prepare_prophet_df(df, 'Income')
 
-        expense_accuracy = get_arima_accuracy(expense_df['price'])
-        income_accuracy = get_arima_accuracy(income_df['price'])
+        # Sri Lankan holidays (add more as needed)
+        holidays = pd.DataFrame({
+            'holiday': [
+                'avurudu', 'vesak', 'christmas', 'new_year', 'independence_day'
+            ],
+            'ds': pd.to_datetime([
+                '2024-04-13',  # Avurudu
+                '2024-05-23',  # Vesak (example, update to actual poya)
+                '2024-12-25',  # Christmas
+                '2024-01-01',  # New Year
+                '2024-02-04',  # Independence Day
+            ]),
+            'lower_window': 0,
+            'upper_window': 2
+        })
 
-        expense_forecast = arima_forecast(expense_df['price'])
-        income_forecast = arima_forecast(income_df['price'])
-        future_dates = pd.date_range(df['date'].max() + pd.Timedelta(days=1), periods=30).strftime('%Y-%m-%d').tolist()
+        def prophet_forecast(df, holidays, periods=30):
+            if len(df) < 3:
+                return [0.0] * periods, None
+            m = Prophet(holidays=holidays, yearly_seasonality=True, weekly_seasonality=True)
+            m.fit(df)
+            future = m.make_future_dataframe(periods=periods)
+            forecast = m.predict(future)
+            yhat = forecast['yhat'][-periods:].tolist()
+            # Calculate accuracy if enough data
+            if len(df) > 40:
+                train = df.iloc[:-periods]
+                test = df.iloc[-periods:]
+                m_train = Prophet(holidays=holidays, yearly_seasonality=True, weekly_seasonality=True)
+                m_train.fit(train)
+                future_train = m_train.make_future_dataframe(periods=periods)
+                forecast_train = m_train.predict(future_train)
+                pred = forecast_train['yhat'][-periods:]
+                test_y = test['y'].values
+                mae = float(np.mean(np.abs(test_y - pred)))
+                rmse = float(np.sqrt(np.mean((test_y - pred) ** 2)))
+                mape = float(np.mean(np.abs((test_y - pred) / (test_y + 1e-8))) * 100)
+                accuracy = {'mae': mae, 'rmse': rmse, 'mape': mape}
+            else:
+                accuracy = None
+            return yhat, accuracy
+
+        expense_forecast, expense_accuracy = prophet_forecast(expense_df, holidays)
+        income_forecast, income_accuracy = prophet_forecast(income_df, holidays)
+        last_date = df['date'].max()
+        future_dates = pd.date_range(last_date + pd.Timedelta(days=1), periods=30).strftime('%Y-%m-%d').tolist()
 
         return jsonify({
             'expense': expense_forecast,
