@@ -27,6 +27,11 @@ from statsmodels.tsa.arima.model import ARIMA
 # Import the centralized db instance and models
 from models import db, User, Transaction, Category, UserCategoryLimit
 
+# Simple in-memory cache for session checks
+session_cache = {}
+import threading
+cache_lock = threading.Lock()
+
 load_dotenv()
 
 # Initialize Flask app
@@ -63,10 +68,14 @@ db_host = os.getenv('MYSQL_HOST')
 db_name = os.getenv('MYSQL_DATABASE')
 app.config['SQLALCHEMY_DATABASE_URI'] = f"mysql+pymysql://{db_user}:{db_password}@{db_host}/{db_name}"
 
-# In your database configuration
+# Database performance optimizations
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'implicit_returning': False,
-    'execution_options': {'isolation_level': 'READ COMMITTED'}
+    'execution_options': {'isolation_level': 'READ COMMITTED'},
+    'pool_size': 10,
+    'pool_recycle': 3600,
+    'pool_pre_ping': True,
+    'max_overflow': 20
 }
 
 # Initialize extensions
@@ -288,6 +297,12 @@ def verify_otp():
         session['user_id'] = user.user_id
         session['email'] = user.email
         session['logged_in'] = True
+        # Cache user info in session for faster session checks
+        session['user_info'] = {
+            "user_id": user.user_id,
+            "username": user.username,
+            "email": user.email
+        }
 
         # Redirect to dashboard with welcome parameter
         redirect_url = 'http://localhost:3000/dashboard?showWelcome=true'
@@ -309,18 +324,57 @@ def verify_otp():
 @app.route('/api/session-check', methods=['GET'])
 def session_check():
     if 'user_id' in session and session.get('logged_in'):
-        user = User.query.get(session['user_id'])
-        if not user:
-            session.clear()
-            return jsonify({"authenticated": False}), 401
-        return jsonify({
-            "authenticated": True,
-            "user": {
+        user_id = session['user_id']
+        
+        # Check cache first
+        with cache_lock:
+            if user_id in session_cache:
+                cached_data = session_cache[user_id]
+                if time.time() - cached_data['timestamp'] < 300:  # 5 minute cache
+                    return jsonify({
+                        "authenticated": True,
+                        "user": cached_data['user_info']
+                    }), 200
+        
+        # Use cached user info from session instead of database query
+        user_info = session.get('user_info')
+        if user_info:
+            # Update cache
+            with cache_lock:
+                session_cache[user_id] = {
+                    'user_info': user_info,
+                    'timestamp': time.time()
+                }
+            return jsonify({
+                "authenticated": True,
+                "user": user_info
+            }), 200
+        else:
+            # Fallback to database query only if session info is missing
+            user = User.query.get(session['user_id'])
+            if not user:
+                session.clear()
+                # Clear cache
+                with cache_lock:
+                    session_cache.pop(user_id, None)
+                return jsonify({"authenticated": False}), 401
+            # Cache user info in session
+            user_info = {
                 "user_id": user.user_id,
                 "username": user.username,
                 "email": user.email
             }
-        }), 200
+            session['user_info'] = user_info
+            # Update cache
+            with cache_lock:
+                session_cache[user_id] = {
+                    'user_info': user_info,
+                    'timestamp': time.time()
+                }
+            return jsonify({
+                "authenticated": True,
+                "user": user_info
+            }), 200
     return jsonify({"authenticated": False}), 401
 
 
@@ -330,7 +384,12 @@ def session_check():
 
 @app.route('/api/logout', methods=['POST'])
 def logout():
+    user_id = session.get('user_id')
     session.clear()
+    # Clear cache
+    if user_id:
+        with cache_lock:
+            session_cache.pop(user_id, None)
     return jsonify({"message": "Logged out successfully"}), 200
 
 
