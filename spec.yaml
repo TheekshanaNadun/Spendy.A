@@ -1,0 +1,56 @@
+name: spendy-app
+services:
+  - name: frontend
+    dockerfile_path: react-app/Dockerfile
+    source_dir: react-app
+    http_port: 3000
+    routes:
+      - path: /
+    envs:
+      - key: REACT_APP_API_URL
+        value: "http://api:5000"
+    health_check:
+      http_path: /
+      port: 3000
+      initial_delay_seconds: 10
+      period_seconds: 10
+      timeout_seconds: 5
+      success_threshold: 1
+      failure_threshold: 3
+
+  - name: api
+    dockerfile_path: Dockerfile
+    source_dir: .
+    http_port: 5000
+    envs:
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_APP
+        value: app.py
+      # Add your DB and secret envs here
+    health_check:
+      http_path: /
+      port: 5000
+      initial_delay_seconds: 10
+      period_seconds: 10
+      timeout_seconds: 5
+      success_threshold: 1
+      failure_threshold: 3
+
+  - name: processor
+    dockerfile_path: Dockerfile
+    source_dir: .
+    run_command: python react-app/public/run.py
+    envs:
+      - key: LOGLEVEL
+        value: WARNING
+    health_check:
+      disable: true
+
+databases:
+  - engine: MYSQL
+    name: spendy-db
+    version: "8"
+    production: true
+    cluster_name: spendy-db-cluster
+    # You can add more DB config here 
