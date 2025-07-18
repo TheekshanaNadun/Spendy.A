@@ -655,8 +655,7 @@ const ChatBotPopup = () => {
         {/* Expense Warning */}
         {transactionInsights.expense_warning && (
           <div className={styles.expenseWarning}>
-            <AlertTriangle size={16} style={{ color: '#ef4444', marginRight: 6 }} />
-            <span style={{ color: '#ef4444', fontWeight: 600 }}>{transactionInsights.expense_warning}</span>
+            <span style={{ color: '#ffff', fontWeight: 400 , paddingBottom: '30px',paddingTop: '30px'}}>{transactionInsights.expense_warning}</span>
           </div>
         )}
 
