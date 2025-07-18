@@ -150,7 +150,7 @@ const SignUpLayer = () => {
               <label className="form-check-label text-sm" htmlFor="condition">
                 By creating an account, you agree to the{" "}
                 <Link to="#" className="text-primary-600 fw-semibold">
-                  Terms &amp; Conditions
+                  Terms & Conditions
                 </Link>{" "}
                 and our{" "}
                 <Link to="#" className="text-primary-600 fw-semibold">
@@ -166,33 +166,6 @@ const SignUpLayer = () => {
             >
               Sign Up
             </button>
-
-            {/* Social Sign-up Section */}
-            <div className="mt-32 center-border-horizontal text-center">
-              <span className="bg-base z-1 px-4">Or sign up with</span>
-            </div>
-            <div className="mt-32 d-flex align-items-center gap-3">
-              <button
-                type="button"
-                className="fw-semibold text-primary-light py-16 px-24 w-50 border radius-12 text-md d-flex align-items-center justify-content-center gap-12 line-height-1 bg-hover-primary-50"
-              >
-                <Icon
-                  icon="ic:baseline-facebook"
-                  className="text-primary-600 text-xl line-height-1"
-                />
-                Facebook
-              </button>
-              <button
-                type="button"
-                className="fw-semibold text-primary-light py-16 px-24 w-50 border radius-12 text-md d-flex align-items-center justify-content-center gap-12 line-height-1 bg-hover-primary-50"
-              >
-                <Icon
-                  icon="logos:google-icon"
-                  className="text-primary-600 text-xl line-height-1"
-                />
-                Google
-              </button>
-            </div>
 
             {/* Sign In Link */}
             <div className="mt-32 text-center text-sm">

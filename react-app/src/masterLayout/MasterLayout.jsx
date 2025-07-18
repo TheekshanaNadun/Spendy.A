@@ -1,17 +1,25 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import { Icon } from "@iconify/react/dist/iconify.js";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import ThemeToggleButton from "../helper/ThemeToggleButton";
 import ChatbotPopup from "../components/ChatBotPopup";
+import { AuthContext } from "../App";
 
 
 const MasterLayout = ({ children }) => {
   let [sidebarActive, seSidebarActive] = useState(false);
   let [mobileMenu, setMobileMenu] = useState(false);
   const location = useLocation(); // Hook to get the current route
+  const { user } = useContext(AuthContext);
 
+  // Helper for initials
+  function getInitials(nameOrEmail) {
+    if (!nameOrEmail) return '?';
+    const parts = nameOrEmail.split('@')[0].split(/[ ._]/);
+    if (parts.length === 1) return parts[0][0].toUpperCase();
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
 
-  
 
   useEffect(() => {
     const handleDropdownClick = (event) => {
@@ -298,231 +306,234 @@ const MasterLayout = ({ children }) => {
                 </form>
               </div>
             </div>
-            <div className='col-auto'>
-              <div className='d-flex flex-wrap align-items-center gap-3'>
-                {/* ThemeToggleButton */}
-                <ThemeToggleButton />
-                
-  
-                <div className='dropdown'>
-                  <button
-                    className='has-indicator w-40-px h-40-px bg-neutral-200 rounded-circle d-flex justify-content-center align-items-center'
-                    type='button'
-                    data-bs-toggle='dropdown'
-                  >
-                    <Icon
-                      icon='iconoir:bell'
-                      className='text-primary-light text-xl'
-                    />
-                  </button>
-                  <div className='dropdown-menu to-top dropdown-menu-lg p-0'>
-                    <div className='m-16 py-12 px-16 radius-8 bg-primary-50 mb-16 d-flex align-items-center justify-content-between gap-2'>
-                      <div>
-                        <h6 className='text-lg text-primary-light fw-semibold mb-0'>
-                          Notifications
-                        </h6>
+            <div className='col-auto d-flex align-items-center gap-4'>
+              {/* Notification dropdown and profile dropdown start */}
+              <div className='dropdown'>
+                <button
+                  className='has-indicator w-40-px h-40-px bg-neutral-200 rounded-circle d-flex justify-content-center align-items-center'
+                  type='button'
+                  data-bs-toggle='dropdown'
+                >
+                  <Icon
+                    icon='iconoir:bell'
+                    className='text-primary-light text-xl'
+                  />
+                </button>
+                <div className='dropdown-menu to-top dropdown-menu-lg p-0'>
+                  <div className='m-16 py-12 px-16 radius-8 bg-primary-50 mb-16 d-flex align-items-center justify-content-between gap-2'>
+                    <div>
+                      <h6 className='text-lg text-primary-light fw-semibold mb-0'>
+                        Notifications
+                      </h6>
+                    </div>
+                    <span className='text-primary-600 fw-semibold text-lg w-40-px h-40-px rounded-circle bg-base d-flex justify-content-center align-items-center'>
+                      05
+                    </span>
+                  </div>
+                  <div className='max-h-400-px overflow-y-auto scroll-sm pe-4'>
+                    <Link
+                      to='#'
+                      className='px-24 py-12 d-flex align-items-start gap-3 mb-2 justify-content-between'
+                    >
+                      <div className='text-black hover-bg-transparent hover-text-primary d-flex align-items-center gap-3'>
+                        <span className='w-44-px h-44-px bg-success-subtle text-success-main rounded-circle d-flex justify-content-center align-items-center flex-shrink-0'>
+                          <Icon
+                            icon='bitcoin-icons:verify-outline'
+                            className='icon text-xxl'
+                          />
+                        </span>
+                        <div>
+                          <h6 className='text-md fw-semibold mb-4'>
+                            Congratulations
+                          </h6>
+                          <p className='mb-0 text-sm text-secondary-light text-w-200-px'>
+                            Your profile has been Verified. Your profile has
+                            been Verified
+                          </p>
+                        </div>
                       </div>
-                      <span className='text-primary-600 fw-semibold text-lg w-40-px h-40-px rounded-circle bg-base d-flex justify-content-center align-items-center'>
-                        05
+                      <span className='text-sm text-secondary-light flex-shrink-0'>
+                        23 Mins ago
                       </span>
-                    </div>
-                    <div className='max-h-400-px overflow-y-auto scroll-sm pe-4'>
-                      <Link
-                        to='#'
-                        className='px-24 py-12 d-flex align-items-start gap-3 mb-2 justify-content-between'
-                      >
-                        <div className='text-black hover-bg-transparent hover-text-primary d-flex align-items-center gap-3'>
-                          <span className='w-44-px h-44-px bg-success-subtle text-success-main rounded-circle d-flex justify-content-center align-items-center flex-shrink-0'>
-                            <Icon
-                              icon='bitcoin-icons:verify-outline'
-                              className='icon text-xxl'
-                            />
-                          </span>
-                          <div>
-                            <h6 className='text-md fw-semibold mb-4'>
-                              Congratulations
-                            </h6>
-                            <p className='mb-0 text-sm text-secondary-light text-w-200-px'>
-                              Your profile has been Verified. Your profile has
-                              been Verified
-                            </p>
-                          </div>
-                        </div>
-                        <span className='text-sm text-secondary-light flex-shrink-0'>
-                          23 Mins ago
+                    </Link>
+                    <Link
+                      to='#'
+                      className='px-24 py-12 d-flex align-items-start gap-3 mb-2 justify-content-between bg-neutral-50'
+                    >
+                      <div className='text-black hover-bg-transparent hover-text-primary d-flex align-items-center gap-3'>
+                        <span className='w-44-px h-44-px bg-success-subtle text-success-main rounded-circle d-flex justify-content-center align-items-center flex-shrink-0'>
+                          <img
+                            src='assets/images/notification/profile-1.png'
+                            alt=''
+                          />
                         </span>
-                      </Link>
-                      <Link
-                        to='#'
-                        className='px-24 py-12 d-flex align-items-start gap-3 mb-2 justify-content-between bg-neutral-50'
-                      >
-                        <div className='text-black hover-bg-transparent hover-text-primary d-flex align-items-center gap-3'>
-                          <span className='w-44-px h-44-px bg-success-subtle text-success-main rounded-circle d-flex justify-content-center align-items-center flex-shrink-0'>
-                            <img
-                              src='assets/images/notification/profile-1.png'
-                              alt=''
-                            />
-                          </span>
-                          <div>
-                            <h6 className='text-md fw-semibold mb-4'>
-                              Ronald Richards
-                            </h6>
-                            <p className='mb-0 text-sm text-secondary-light text-w-200-px'>
-                              You can stitch between artboards
-                            </p>
-                          </div>
+                        <div>
+                          <h6 className='text-md fw-semibold mb-4'>
+                            Ronald Richards
+                          </h6>
+                          <p className='mb-0 text-sm text-secondary-light text-w-200-px'>
+                            You can stitch between artboards
+                          </p>
                         </div>
-                        <span className='text-sm text-secondary-light flex-shrink-0'>
-                          23 Mins ago
+                      </div>
+                      <span className='text-sm text-secondary-light flex-shrink-0'>
+                        23 Mins ago
+                      </span>
+                    </Link>
+                    <Link
+                      to='#'
+                      className='px-24 py-12 d-flex align-items-start gap-3 mb-2 justify-content-between'
+                    >
+                      <div className='text-black hover-bg-transparent hover-text-primary d-flex align-items-center gap-3'>
+                        <span className='w-44-px h-44-px bg-info-subtle text-info-main rounded-circle d-flex justify-content-center align-items-center flex-shrink-0'>
+                          AM
                         </span>
-                      </Link>
-                      <Link
-                        to='#'
-                        className='px-24 py-12 d-flex align-items-start gap-3 mb-2 justify-content-between'
-                      >
-                        <div className='text-black hover-bg-transparent hover-text-primary d-flex align-items-center gap-3'>
-                          <span className='w-44-px h-44-px bg-info-subtle text-info-main rounded-circle d-flex justify-content-center align-items-center flex-shrink-0'>
-                            AM
-                          </span>
-                          <div>
-                            <h6 className='text-md fw-semibold mb-4'>
-                              Arlene McCoy
-                            </h6>
-                            <p className='mb-0 text-sm text-secondary-light text-w-200-px'>
-                              Invite you to prototyping
-                            </p>
-                          </div>
+                        <div>
+                          <h6 className='text-md fw-semibold mb-4'>
+                            Arlene McCoy
+                          </h6>
+                          <p className='mb-0 text-sm text-secondary-light text-w-200-px'>
+                            Invite you to prototyping
+                          </p>
                         </div>
-                        <span className='text-sm text-secondary-light flex-shrink-0'>
-                          23 Mins ago
+                      </div>
+                      <span className='text-sm text-secondary-light flex-shrink-0'>
+                        23 Mins ago
+                      </span>
+                    </Link>
+                    <Link
+                      to='#'
+                      className='px-24 py-12 d-flex align-items-start gap-3 mb-2 justify-content-between bg-neutral-50'
+                    >
+                      <div className='text-black hover-bg-transparent hover-text-primary d-flex align-items-center gap-3'>
+                        <span className='w-44-px h-44-px bg-success-subtle text-success-main rounded-circle d-flex justify-content-center align-items-center flex-shrink-0'>
+                          <img
+                            src='assets/images/notification/profile-2.png'
+                            alt=''
+                          />
                         </span>
-                      </Link>
-                      <Link
-                        to='#'
-                        className='px-24 py-12 d-flex align-items-start gap-3 mb-2 justify-content-between bg-neutral-50'
-                      >
-                        <div className='text-black hover-bg-transparent hover-text-primary d-flex align-items-center gap-3'>
-                          <span className='w-44-px h-44-px bg-success-subtle text-success-main rounded-circle d-flex justify-content-center align-items-center flex-shrink-0'>
-                            <img
-                              src='assets/images/notification/profile-2.png'
-                              alt=''
-                            />
-                          </span>
-                          <div>
-                            <h6 className='text-md fw-semibold mb-4'>
-                              Annette Black
-                            </h6>
-                            <p className='mb-0 text-sm text-secondary-light text-w-200-px'>
-                              Invite you to prototyping
-                            </p>
-                          </div>
+                        <div>
+                          <h6 className='text-md fw-semibold mb-4'>
+                            Annette Black
+                          </h6>
+                          <p className='mb-0 text-sm text-secondary-light text-w-200-px'>
+                            Invite you to prototyping
+                          </p>
                         </div>
-                        <span className='text-sm text-secondary-light flex-shrink-0'>
-                          23 Mins ago
+                      </div>
+                      <span className='text-sm text-secondary-light flex-shrink-0'>
+                        23 Mins ago
+                      </span>
+                    </Link>
+                    <Link
+                      to='#'
+                      className='px-24 py-12 d-flex align-items-start gap-3 mb-2 justify-content-between'
+                    >
+                      <div className='text-black hover-bg-transparent hover-text-primary d-flex align-items-center gap-3'>
+                        <span className='w-44-px h-44-px bg-info-subtle text-info-main rounded-circle d-flex justify-content-center align-items-center flex-shrink-0'>
+                          DR
                         </span>
-                      </Link>
-                      <Link
-                        to='#'
-                        className='px-24 py-12 d-flex align-items-start gap-3 mb-2 justify-content-between'
-                      >
-                        <div className='text-black hover-bg-transparent hover-text-primary d-flex align-items-center gap-3'>
-                          <span className='w-44-px h-44-px bg-info-subtle text-info-main rounded-circle d-flex justify-content-center align-items-center flex-shrink-0'>
-                            DR
-                          </span>
-                          <div>
-                            <h6 className='text-md fw-semibold mb-4'>
-                              Darlene Robertson
-                            </h6>
-                            <p className='mb-0 text-sm text-secondary-light text-w-200-px'>
-                              Invite you to prototyping
-                            </p>
-                          </div>
+                        <div>
+                          <h6 className='text-md fw-semibold mb-4'>
+                            Darlene Robertson
+                          </h6>
+                          <p className='mb-0 text-sm text-secondary-light text-w-200-px'>
+                            Invite you to prototyping
+                          </p>
                         </div>
-                        <span className='text-sm text-secondary-light flex-shrink-0'>
-                          23 Mins ago
-                        </span>
-                      </Link>
-                    </div>
-                    <div className='text-center py-12 px-16'>
-                      <Link
-                        to='#'
-                        className='text-primary-600 fw-semibold text-md'
-                      >
-                        See All Notification
-                      </Link>
-                    </div>
+                      </div>
+                      <span className='text-sm text-secondary-light flex-shrink-0'>
+                        23 Mins ago
+                      </span>
+                    </Link>
+                  </div>
+                  <div className='text-center py-12 px-16'>
+                    <Link
+                      to='#'
+                      className='text-primary-600 fw-semibold text-md'
+                    >
+                      See All Notification
+                    </Link>
                   </div>
                 </div>
-                {/* Notification dropdown end */}
-                <div className='dropdown'>
-                  <button
-                    className='d-flex justify-content-center align-items-center rounded-circle'
-                    type='button'
-                    data-bs-toggle='dropdown'
-                  >
+              </div>
+              {/* Notification dropdown end */}
+              <div className='dropdown'>
+                <button
+                  className='d-flex justify-content-center align-items-center rounded-circle'
+                  type='button'
+                  data-bs-toggle='dropdown'
+                >
+                  {user && user.profile_image ? (
                     <img
-                      src='assets/images/user.png'
-                      alt='image_user'
+                      src={`data:image/png;base64,${user.profile_image}`}
+                      alt='user'
                       className='w-40-px h-40-px object-fit-cover rounded-circle'
                     />
-                  </button>
-                  <div className='dropdown-menu to-top dropdown-menu-sm'>
-                    <div className='py-12 px-16 radius-8 bg-primary-50 mb-16 d-flex align-items-center justify-content-between gap-2'>
-                      <div>
-                        <h6 className='text-lg text-primary-light fw-semibold mb-2'>
-                          Shaidul Islam
-                        </h6>
+                  ) : (
+                    <span className='w-40-px h-40-px bg-info-subtle text-info-main rounded-circle d-flex justify-content-center align-items-center flex-shrink-0 fw-bold' style={{ fontSize: 18 }}>
+                      {/* Show only first letter of username or email for avatar, capitalized */}
+                      {((user?.username || user?.email || '?')[0] || '').toUpperCase()}
+                    </span>
+                  )}
+                </button>
+                <div className='dropdown-menu to-top dropdown-menu-sm'>
+                  <div className='py-12 px-16 radius-8 bg-primary-50 mb-16 d-flex align-items-center justify-content-between gap-2'>
+                    <div>
+                      <h6 className='text-lg text-primary-light fw-semibold mb-2'>
+                        {/* Show only first 10 letters of username or email */}
+                        {(user?.username || user?.email || 'User').substring(0, 10)}
+                      </h6>
+                      {user?.role && (
                         <span className='text-secondary-light fw-medium text-sm'>
-                          Admin
+                          {user.role}
                         </span>
-                      </div>
-                      <button type='button' className='hover-text-danger'>
-                        <Icon
-                          icon='radix-icons:cross-1'
-                          className='icon text-xl'
-                        />
-                      </button>
+                      )}
                     </div>
-                    <ul className='to-top-list'>
-                      <li>
-                        <Link
-                          className='dropdown-item text-black px-0 py-8 hover-bg-transparent hover-text-primary d-flex align-items-center gap-3'
-                          to='/view-profile'
-                        >
-                          <Icon
-                            icon='solar:user-linear'
-                            className='icon text-xl'
-                          />{" "}
-                          My Profile
-                        </Link>
-                      </li>
-                     
-                    
-                      <li>
-                      <button
-  className='dropdown-item text-black px-0 py-8 hover-bg-transparent hover-text-danger d-flex align-items-center gap-3'
-  onClick={async () => {
-    try {
-      await fetch('http://localhost:5000/api/logout', {
-        method: 'POST',
-        credentials: 'include'
-      });
-      window.location.href = '/'; // Or use navigate('/') if using React Router
-    } catch (error) {
-      console.error('Logout failed:', error);
-    }
-  }}
-  style={{ background: 'transparent', border: 'none', width: '100%' }}
->
-  <Icon icon='lucide:power' className='icon text-xl' />
-  Log Out
-</button>
-                      </li>
-                    </ul>
+                    <button type='button' className='hover-text-danger'>
+                      <Icon
+                        icon='radix-icons:cross-1'
+                        className='icon text-xl'
+                      />
+                    </button>
                   </div>
+                  <ul className='to-top-list'>
+                    <li>
+                      <Link
+                        className='dropdown-item text-black px-0 py-8 hover-bg-transparent hover-text-primary d-flex align-items-center gap-3'
+                        to='/view-profile'
+                      >
+                        <Icon
+                          icon='solar:user-linear'
+                          className='icon text-xl'
+                        />{" "}
+                        My Profile
+                      </Link>
+                    </li>
+                    <li>
+                      <button
+                        className='dropdown-item text-black px-0 py-8 hover-bg-transparent hover-text-danger d-flex align-items-center gap-3'
+                        onClick={async () => {
+                          try {
+                            await fetch('http://localhost:5000/api/logout', {
+                              method: 'POST',
+                              credentials: 'include'
+                            });
+                            window.location.href = '/';
+                          } catch (error) {
+                            console.error('Logout failed:', error);
+                          }
+                        }}
+                        style={{ background: 'transparent', border: 'none', width: '100%' }}
+                      >
+                        <Icon icon='lucide:power' className='icon text-xl' />
+                        Log Out
+                      </button>
+                    </li>
+                  </ul>
                 </div>
-                {/* Profile dropdown end */}
               </div>
+              {/* Profile dropdown end */}
             </div>
           </div>
         </div>

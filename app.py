@@ -22,6 +22,7 @@ from dateutil.relativedelta import relativedelta
 import pandas as pd
 from prophet import Prophet
 import numpy as np
+import base64
 
 # Import the centralized db instance and models
 from models import db, User, Transaction, Category, UserCategoryLimit
@@ -1109,6 +1110,70 @@ def predict_next_month():
     except Exception as e:
         app.logger.error(f"Prediction error: {str(e)}")
         return jsonify({"error": "Prediction failed."}), 500
+
+@app.route('/api/profile', methods=['GET'])
+@require_login
+def view_profile():
+    user = User.query.get(session['user_id'])
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    profile_image_b64 = None
+    if user.profile_image:
+        profile_image_b64 = base64.b64encode(user.profile_image).decode('utf-8')
+    return jsonify({
+        'user_id': user.user_id,
+        'username': user.username,
+        'email': user.email,
+        'monthly_limit': user.monthly_limit,
+        'profile_image': profile_image_b64
+    })
+
+@app.route('/api/change-password', methods=['POST'])
+@require_login
+def change_password():
+    data = request.get_json()
+    old_password = data.get('old_password')
+    new_password = data.get('new_password')
+    if not old_password or not new_password:
+        return jsonify({'error': 'Old and new password required'}), 400
+    user = User.query.get(session['user_id'])
+    if not user or not check_password_hash(user.password_hash, old_password):
+        return jsonify({'error': 'Old password is incorrect'}), 400
+    user.password_hash = generate_password_hash(new_password)
+    db.session.commit()
+    return jsonify({'message': 'Password updated successfully'})
+
+@app.route('/api/calendar-daily-summary', methods=['GET'])
+@require_login
+def calendar_daily_summary():
+    user_id = session['user_id']
+    today = datetime.utcnow().date()
+    start_date = today - timedelta(days=29)
+    # Get all transactions in the last 30 days
+    transactions = Transaction.query.filter(
+        Transaction.user_id == user_id,
+        Transaction.date >= start_date,
+        Transaction.date <= today
+    ).all()
+    # Aggregate by day
+    summary = {}
+    for t in transactions:
+        d = t.date.strftime('%Y-%m-%d')
+        if d not in summary:
+            summary[d] = {'date': d, 'total_expense': 0, 'total_income': 0}
+        if t.type == 'Expense':
+            summary[d]['total_expense'] += t.price
+        elif t.type == 'Income':
+            summary[d]['total_income'] += t.price
+    # Fill missing days with zeros
+    result = []
+    for i in range(30):
+        d = (start_date + timedelta(days=i)).strftime('%Y-%m-%d')
+        if d in summary:
+            result.append(summary[d])
+        else:
+            result.append({'date': d, 'total_expense': 0, 'total_income': 0})
+    return jsonify(result)
 
 if __name__ == "__main__":
     app.run(debug=False, host="0.0.0.0", port=5000)

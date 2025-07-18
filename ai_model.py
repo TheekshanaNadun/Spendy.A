@@ -21,7 +21,7 @@ def arima_forecast(series: pd.Series, steps: int = 30) -> list:
         return [float(x) for x in forecast]
     except Exception:
         # fallback: repeat last value
-        return [float(series.iloc[-1])] * steps
+        return [float(series.iloc[-1])] * steps 
 
 def detect_anomalies(transactions_df: pd.DataFrame, contamination: float = 0.1) -> dict:
     """

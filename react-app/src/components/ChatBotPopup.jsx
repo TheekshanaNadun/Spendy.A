@@ -149,9 +149,9 @@ const ChatBotPopup = () => {
 
     try {
       // Create recognition instance
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
-      
+    
       // Configure recognition
       recognitionRef.current.continuous = false;
       recognitionRef.current.interimResults = false;
@@ -161,15 +161,15 @@ const ChatBotPopup = () => {
       // Set up event handlers
       recognitionRef.current.onstart = () => {
         console.log('Voice recognition started');
-        setIsListening(true);
+    setIsListening(true);
         isListeningRef.current = true;
         setError(null);
       };
 
       recognitionRef.current.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
+      const transcript = event.results[0][0].transcript;
         console.log('Voice transcript:', transcript);
-        setInputText(transcript);
+      setInputText(transcript);
         stopVoiceRecognition();
       };
 
@@ -200,9 +200,9 @@ const ChatBotPopup = () => {
 
       recognitionRef.current.onend = () => {
         console.log('Voice recognition ended');
-        setIsListening(false);
+      setIsListening(false);
         isListeningRef.current = false;
-      };
+    };
 
       // Start recognition
       recognitionRef.current.start();
@@ -259,7 +259,12 @@ const ChatBotPopup = () => {
 
       const response = await sendMessageToServer(message);
       
-      if (response.status === "success") {
+      if (response.status === "retry") {
+        setMessages(prev => [...prev, {
+          text: response.message || "Sorry, I didn’t understand. Please describe your transaction (e.g., 'I spent 5000 on groceries').",
+          isBot: true
+        }]);
+      } else if (response.status === "success") {
         if (response.message_type === "question") {
           // Handle question response
           setMessages(prev => [...prev, { 
@@ -271,7 +276,6 @@ const ChatBotPopup = () => {
         } else {
           // Handle transaction response
           setPendingTransaction(response);
-          
           setMessages(prev => [...prev, { 
             text: "I've processed your transaction. Please review and confirm:",
             isBot: true,
@@ -739,11 +743,11 @@ const ChatBotPopup = () => {
             <div className={styles.chatArea}>
               {messages.map((msg, index) => (
                 <div key={index}>
-                  <div 
-                    className={`${styles.message} ${msg.isBot ? styles.botMsg : styles.userMsg}`}
-                  >
-                    {msg.text}
-                    {msg.isBot && <div className={styles.botIndicator}><Bot size={12} /></div>}
+                <div 
+                  className={`${styles.message} ${msg.isBot ? styles.botMsg : styles.userMsg}`}
+                >
+                  {msg.text}
+                  {msg.isBot && <div className={styles.botIndicator}><Bot size={12} /></div>}
                   </div>
                   {/* Show transaction card OR market insights, not both */}
                   {msg.structuredData && renderStructuredData(msg)}
@@ -774,7 +778,7 @@ const ChatBotPopup = () => {
                       <div className={styles.recordingDot} />
                     </div>
                   ) : (
-                    <Mic size={18} />
+                  <Mic size={18} />
                   )}
                 </button>
                 <input

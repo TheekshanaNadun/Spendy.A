@@ -485,7 +485,7 @@ def call_kluster_api(message, user_context=None, message_type='transaction'):
             - Preferred locations: {[loc for loc, _ in user_context.get('top_locations', [])]}
             """
         
-        system_prompt = (
+    system_prompt = (
             f"You are an intelligent financial assistant for Spendy.AI. Analyze the user's message and extract structured transaction data. "
             f"{user_context_str}"
             f"Consider the user's spending patterns and provide personalized insights. "
@@ -501,18 +501,18 @@ def call_kluster_api(message, user_context=None, message_type='transaction'):
             f"The 'price' must be an integer. The 'type' must be either 'Income' or 'Expense'. "
             f"The 'suggestions' should be an array of helpful tips or alternatives. "
             f"If a value is not available, use null for that key."
-        )
+    )
         
-        payload = {
-            "model": "klusterai/Meta-Llama-3.3-70B-Instruct-Turbo",
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": message}
-            ],
+    payload = {
+        "model": "klusterai/Meta-Llama-3.3-70B-Instruct-Turbo",
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": message}
+        ],
             "temperature": 0.1,
-            "top_p": 0.9,
-            "stream": False
-        }
+        "top_p": 0.9,
+        "stream": False
+    }
     
     headers = {
         "Authorization": f"Bearer {KLUSTER_API_KEY}",
@@ -531,12 +531,9 @@ def parse_kluster_response(response, message_type='transaction'):
     try:
         if not response or 'choices' not in response:
             raise ValueError("Invalid Kluster API response: Missing 'choices'")
-
         content = response["choices"][0]["message"]["content"]
         logger.debug(f"Kluster API response content: {content}")
-
         if message_type == 'question':
-            # For questions, return the text response directly
             return {
                 'type': 'question_response',
                 'content': content,
@@ -546,35 +543,32 @@ def parse_kluster_response(response, message_type='transaction'):
             # For transactions, parse JSON
             try:
                 parsed_data = json.loads(content)
-                
                 # Basic validation of the parsed data
                 required_keys = ['item', 'category', 'price', 'type']
                 if not all(key in parsed_data for key in required_keys):
                     raise ValueError(f"Missing one or more required keys in AI response: {required_keys}")
-                
                 # Handle null or missing date - use current date as default
                 if not parsed_data.get('date'):
                     parsed_data['date'] = datetime.now().strftime('%Y-%m-%d')
-                
                 # Set defaults for optional fields if they are missing or null
                 parsed_data.setdefault('location', None)
                 parsed_data.setdefault('timestamp', datetime.now().strftime("%H:%M:%S"))
                 parsed_data.setdefault('latitude', None)
                 parsed_data.setdefault('longitude', None)
                 parsed_data.setdefault('suggestions', [])  # Default empty suggestions
-
                 return {
                     'type': 'transaction_data',
                     'data': parsed_data,
                     'message_type': 'transaction'
                 }
-
             except json.JSONDecodeError:
                 logger.error(f"Failed to decode JSON from Kluster response: {content}")
                 return None
-
-    except (ValueError, KeyError) as e:
-        logger.error(f"Error parsing Kluster response: {e}")
+            except (ValueError, KeyError) as e:
+                logger.error(f"Error parsing Kluster response: {e}")
+                return None
+    except Exception as e:
+        logger.error(f"Error in parse_kluster_response: {e}")
         return None
 
 
@@ -816,8 +810,46 @@ def process_message():
         if not parsed_response:
             return jsonify({"error": "Failed to parse transaction response"}), 500
 
+        # Check if the LLM/classifier determined this is a transaction
+        if parsed_response.get('message_type') != 'transaction':
+            return jsonify({
+                "status": "retry",
+                "message": "Sorry, I didn’t understand. Please describe your transaction (e.g., 'I spent 5000 on groceries')."
+            })
+
+        # Only process and return a transaction if message_type is 'transaction'
         structured_data = parsed_response['data']
 
+        # Patch: Only accept price if user provided a number in their message
+        user_message = request.json.get('message', '')
+        import re
+        user_provided_price = re.search(r'\b\d+[.,]?\d*\b', user_message)
+        if not user_provided_price:
+            structured_data['price'] = 0
+
+        # Robust defaults for structured_data
+        defaults = {
+            'item': '',
+            'price': 0,
+            'category': '',
+            'type': 'Expense',
+            'date': datetime.now().strftime('%Y-%m-%d'),
+            'location': '',
+            'latitude': request.json.get('latitude'),
+            'longitude': request.json.get('longitude'),
+            'suggestions': []
+        }
+        for key, value in defaults.items():
+            if key not in structured_data or structured_data[key] is None:
+                structured_data[key] = value
+        # If item is missing or empty, set to 'item' (the literal string)
+        if not structured_data['item']:
+            structured_data['item'] = 'item'
+        # Ensure price is numeric
+        try:
+            structured_data['price'] = float(structured_data['price'])
+        except (ValueError, TypeError):
+            structured_data['price'] = 0
         # Ensure type is either 'Income' or 'Expense' (case-insensitive)
         valid_types = ['Income', 'Expense']
         if 'type' in structured_data and structured_data['type']:
@@ -834,24 +866,39 @@ def process_message():
                     else:
                         type_value = 'Expense'
                 else:
-                    return jsonify({"error": "Transaction type must be either 'Income' or 'Expense'"}), 400
+                    type_value = 'Expense'
             structured_data['type'] = type_value
         else:
-            return jsonify({"error": "Transaction type is missing in the response"}), 400
-
-        structured_data["user_id"] = user_id
-        structured_data["latitude"] = request.json.get('latitude')
-        structured_data["longitude"] = request.json.get('longitude')
-
+            structured_data['type'] = 'Expense'
         # If location is missing, fetch from last transaction
         if not structured_data.get('location'):
             last_tx = Transaction.query.filter_by(user_id=user_id).order_by(Transaction.date.desc(), Transaction.timestamp.desc()).first()
             if last_tx and last_tx.location:
                 structured_data['location'] = last_tx.location
-
-        # If date is missing, set to today
-        if not structured_data.get('date'):
+        # Override date if user message contains 'yesterday' or 'today'
+        user_message = request.json.get('message', '').lower()
+        date_str = str(structured_data.get('date', '')).strip().lower()
+        if 'yesterday' in user_message:
+            structured_data['date'] = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+        elif 'today' in user_message or date_str in ('', 'today'):
             structured_data['date'] = datetime.now().strftime('%Y-%m-%d')
+        else:
+            try:
+                # Try parsing as YYYY-MM-DD or similar
+                structured_data['date'] = datetime.strptime(date_str, '%Y-%m-%d').strftime('%Y-%m-%d')
+            except Exception:
+                structured_data['date'] = datetime.now().strftime('%Y-%m-%d')
+
+        # Minimum validity check: if all fields are default, treat as not a real transaction
+        if (
+            (structured_data['item'] == 'item' or not structured_data['item']) and
+            (structured_data['price'] == 0 or structured_data['price'] == '0') and
+            not structured_data['category']
+        ):
+            return jsonify({
+                "status": "retry",
+                "message": "Sorry, I didn’t understand. Please describe your transaction (e.g., 'I spent 5000 on groceries')."
+            })
 
         # Generate insights and recommendations (without saving to database yet)
         insights = generate_transaction_insights(user_id, structured_data, user_context)
