@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import $ from 'jquery';
 import 'datatables.net-dt/js/dataTables.dataTables.js';
 import { Icon } from '@iconify/react';
+import Swal from 'sweetalert2';
 
 const TransactionTable = () => {
     const [transactions, setTransactions] = useState([]);
@@ -11,22 +12,28 @@ const TransactionTable = () => {
     const [page, setPage] = useState(1);
     const perPage = 10;
 
+    const fetchTransactions = async () => {
+        try {
+            setLoading(true);
+            const response = await fetch(`http://localhost:5000/api/transactions?page=${page}&per_page=${perPage}`, {
+                credentials: 'include'
+            });
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const data = await response.json();
+            setTransactions(data);
+        } catch (error) {
+            console.error('Error:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Failed to fetch transactions'
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const fetchTransactions = async () => {
-            try {
-                setLoading(true);
-                const response = await fetch(`http://localhost:5000/api/transactions?page=${page}&per_page=${perPage}`, {
-                    credentials: 'include'
-                });
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                const data = await response.json();
-                setTransactions(data);
-            } catch (error) {
-                console.error('Error:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
         fetchTransactions();
     }, [page]);
     
@@ -109,31 +116,69 @@ const TransactionTable = () => {
             
             setTransactions(newData);
             setShowEditModal(false);
+            Swal.fire({
+                icon: 'success',
+                title: 'Updated!',
+                text: 'Transaction has been updated successfully',
+                timer: 2000,
+                showConfirmButton: false
+            });
     
         } catch (error) {
             console.error('Update error:', error);
-            alert('Failed to update transaction');
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Failed to update transaction'
+            });
         }
     };
     
     const handleDelete = async (id) => {
-        if (window.confirm('Are you sure you want to delete this transaction?')) {
+        // Use SweetAlert2 for better confirmation
+        const result = await Swal.fire({
+            title: 'Are you sure?',
+            text: "You won't be able to revert this!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Yes, delete it!',
+            cancelButtonText: 'Cancel'
+        });
+
+        if (result.isConfirmed) {
             try {
+                setLoading(true);
                 const response = await fetch(`http://localhost:5000/api/transactions/${id}`, {
                     method: 'DELETE',
                     credentials: 'include'
                 });
                 
                 if (response.ok) {
-                    // Use pagination.currentPage from existing state
-                    const newData = await fetch(`http://localhost:5000/api/transactions?page=${page}`, {
-                        credentials: 'include'
-                    }).then(res => res.json());
-                    
-                    setTransactions(newData);
+                    // Show success notification
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Deleted!',
+                        text: 'Transaction has been deleted successfully',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+
+                    // Refresh the transactions list
+                    await fetchTransactions();
+                } else {
+                    throw new Error('Failed to delete transaction');
                 }
             } catch (error) {
                 console.error('Delete error:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'Failed to delete transaction'
+                });
+            } finally {
+                setLoading(false);
             }
         }
     };
@@ -241,51 +286,60 @@ const TransactionTable = () => {
                                                 </span>
                                             </td>
                                             <td>
-                                                <button
-                                                    title="Edit"
-                                                    onClick={() => { setSelectedTransaction(transaction); setShowEditModal(true); }}
-                                                    style={{
-                                                        background: 'linear-gradient(135deg, #4f8cff 0%, #6dd5ed 100%)',
-                                                        border: 'none',
-                                                        borderRadius: '50%',
-                                                        width: '36px',
-                                                        height: '36px',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        color: 'white',
-                                                        marginRight: '8px',
-                                                        boxShadow: '0 2px 8px rgba(79,140,255,0.08)',
-                                                        transition: 'box-shadow 0.2s, transform 0.2s',
-                                                        cursor: 'pointer',
-                                                    }}
-                                                    onMouseOver={e => { e.currentTarget.style.boxShadow = '0 4px 16px rgba(79,140,255,0.18)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
-                                                    onMouseOut={e => { e.currentTarget.style.boxShadow = '0 2px 8px rgba(79,140,255,0.08)'; e.currentTarget.style.transform = 'none'; }}
-                                                >
-                                                    <Icon icon="mdi:pencil" width="18" />
-                                                </button>
-                                                <button
-                                                    title="Delete"
-                                                    onClick={() => handleDelete(transaction.transaction_id)}
-                                                    style={{
-                                                        background: 'linear-gradient(135deg, #ff5858 0%, #f09819 100%)',
-                                                        border: 'none',
-                                                        borderRadius: '50%',
-                                                        width: '36px',
-                                                        height: '36px',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        color: 'white',
-                                                        boxShadow: '0 2px 8px rgba(255,88,88,0.08)',
-                                                        transition: 'box-shadow 0.2s, transform 0.2s',
-                                                        cursor: 'pointer',
-                                                    }}
-                                                    onMouseOver={e => { e.currentTarget.style.boxShadow = '0 4px 16px rgba(255,88,88,0.18)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
-                                                    onMouseOut={e => { e.currentTarget.style.boxShadow = '0 2px 8px rgba(255,88,88,0.08)'; e.currentTarget.style.transform = 'none'; }}
-                                                >
-                                                    <Icon icon="mdi:delete" width="18" />
-                                                </button>
+                                                <div className="d-flex gap-2">
+                                                    <button
+                                                        title="Edit Transaction"
+                                                        onClick={() => { setSelectedTransaction(transaction); setShowEditModal(true); }}
+                                                        className="btn btn-sm btn-outline-primary"
+                                                        style={{
+                                                            width: '32px',
+                                                            height: '32px',
+                                                            borderRadius: '6px',
+                                                            padding: '0',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            transition: 'all 0.2s ease',
+                                                            borderWidth: '1.5px'
+                                                        }}
+                                                        onMouseOver={(e) => {
+                                                            e.currentTarget.style.transform = 'translateY(-1px)';
+                                                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(13, 110, 253, 0.2)';
+                                                        }}
+                                                        onMouseOut={(e) => {
+                                                            e.currentTarget.style.transform = 'translateY(0)';
+                                                            e.currentTarget.style.boxShadow = 'none';
+                                                        }}
+                                                    >
+                                                        <Icon icon="mdi:pencil" width="16" />
+                                                    </button>
+                                                    <button
+                                                        title="Delete Transaction"
+                                                        onClick={() => handleDelete(transaction.transaction_id)}
+                                                        className="btn btn-sm btn-outline-danger"
+                                                        style={{
+                                                            width: '32px',
+                                                            height: '32px',
+                                                            borderRadius: '6px',
+                                                            padding: '0',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            transition: 'all 0.2s ease',
+                                                            borderWidth: '1.5px'
+                                                        }}
+                                                        onMouseOver={(e) => {
+                                                            e.currentTarget.style.transform = 'translateY(-1px)';
+                                                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(220, 53, 69, 0.2)';
+                                                        }}
+                                                        onMouseOut={(e) => {
+                                                            e.currentTarget.style.transform = 'translateY(0)';
+                                                            e.currentTarget.style.boxShadow = 'none';
+                                                        }}
+                                                    >
+                                                        <Icon icon="mdi:delete" width="16" />
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}

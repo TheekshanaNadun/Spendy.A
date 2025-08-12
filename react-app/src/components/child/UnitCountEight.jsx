@@ -34,72 +34,93 @@ const UnitCountEight = () => {
     if (error) return <div className="text-danger">{error}</div>;
     if (!dashboardData) return <div className="text-secondary">No data available.</div>;
 
-    const { currentMonthIncome = 0, currentMonthExpense = 0, netProfit = 0, totalSavings = 0 } = dashboardData;
+    // Use the correct fields from dashboard data
+    const { 
+        currentMonthIncome = 0, 
+        currentMonthExpense = 0, 
+        netProfitCurrent = 0, 
+        totalSavings = 0 
+    } = dashboardData;
+
+    // Debug logging to see what data we're getting
+    console.log('Dashboard Data received:', dashboardData);
+    console.log('Current Month Income:', currentMonthIncome);
+    console.log('Current Month Expense:', currentMonthExpense);
+    console.log('Net Profit Current:', netProfitCurrent);
+    console.log('Total Savings:', totalSavings);
+
+    // Ensure we have valid numbers
+    const safeIncome = typeof currentMonthIncome === 'number' ? currentMonthIncome : 0;
+    const safeExpense = typeof currentMonthExpense === 'number' ? currentMonthExpense : 0;
+    const safeNetProfit = typeof netProfitCurrent === 'number' ? netProfitCurrent : 0;
+    const safeTotalSavings = typeof totalSavings === 'number' ? totalSavings : 0;
 
     // Check if we have any financial data
-    const hasData = currentMonthIncome > 0 || currentMonthExpense > 0 || netProfit > 0 || totalSavings > 0;
+    const hasData = safeIncome > 0 || safeExpense > 0 || Math.abs(safeNetProfit) > 0 || Math.abs(safeTotalSavings) > 0;
 
     return (
         <div className="row gy-4">
             {hasData ? (
                 <>
                     <div className="col-xxl-3 col-md-6">
-                        <div className="card h-100 p-0">
-                            <div className="card-body p-24">
+                        <div className="card h-100">
+                            <div className="card-body">
                                 <div className="d-flex align-items-center justify-content-between">
                                     <div>
-                                        <h6 className="text-lg fw-semibold mb-2">Monthly Income</h6>
-                                        <h4 className="text-success mb-0">LKR {currentMonthIncome.toLocaleString()}</h4>
+                                        <p className="text-muted mb-1 small">Monthly Income</p>
+                                        <h6 className="text-success mb-0 fw-normal">LKR {safeIncome.toLocaleString()}</h6>
                                     </div>
-                                    <div className="bg-success-100 p-3 rounded">
-                                        <i className="ri-bank-line text-success text-2xl"></i>
+                                    <div className="text-success">
+                                        <i className="ri-bank-line text-lg"></i>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                     <div className="col-xxl-3 col-md-6">
-                        <div className="card h-100 p-0">
-                            <div className="card-body p-24">
+                        <div className="card h-100">
+                            <div className="card-body">
                                 <div className="d-flex align-items-center justify-content-between">
                                     <div>
-                                        <h6 className="text-lg fw-semibold mb-2">Monthly Expenses</h6>
-                                        <h4 className="text-danger mb-0">LKR {currentMonthExpense.toLocaleString()}</h4>
+                                        <p className="text-muted mb-1 small">Monthly Expenses</p>
+                                        <h6 className="text-danger mb-0 fw-normal">LKR {safeExpense.toLocaleString()}</h6>
                                     </div>
-                                    <div className="bg-danger-100 p-3 rounded">
-                                        <i className="ri-money-dollar-circle-line text-danger text-2xl"></i>
+                                    <div className="text-danger">
+                                        <i className="ri-money-dollar-circle-line text-lg"></i>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                     <div className="col-xxl-3 col-md-6">
-                        <div className="card h-100 p-0">
-                            <div className="card-body p-24">
+                        <div className="card h-100">
+                            <div className="card-body">
                                 <div className="d-flex align-items-center justify-content-between">
                                     <div>
-                                        <h6 className="text-lg fw-semibold mb-2">Net Profit</h6>
-                                        <h4 className={`mb-0 ${netProfit >= 0 ? 'text-success' : 'text-danger'}`}>
-                                            LKR {netProfit.toLocaleString()}
-                                        </h4>
+                                        <p className="text-muted mb-1 small">Net Profit</p>
+                                        <h6 className={`mb-0 fw-normal ${safeNetProfit >= 0 ? 'text-success' : 'text-danger'}`}>
+                                            LKR {safeNetProfit.toLocaleString()}
+                                        </h6>
                                     </div>
-                                    <div className={`p-3 rounded ${netProfit >= 0 ? 'bg-success-100' : 'bg-danger-100'}`}>
-                                        <i className={`ri-arrow-${netProfit >= 0 ? 'up' : 'down'}-line text-2xl ${netProfit >= 0 ? 'text-success' : 'text-danger'}`}></i>
+                                    <div className={safeNetProfit >= 0 ? 'text-success' : 'text-danger'}>
+                                        <i className={`ri-arrow-${safeNetProfit >= 0 ? 'up' : 'down'}-line text-lg`}></i>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                     <div className="col-xxl-3 col-md-6">
-                        <div className="card h-100 p-0">
-                            <div className="card-body p-24">
+                        <div className="card h-100">
+                            <div className="card-body">
                                 <div className="d-flex align-items-center justify-content-between">
                                     <div>
-                                        <h6 className="text-lg fw-semibold mb-2">Total Savings</h6>
-                                        <h4 className="text-primary mb-0">LKR {totalSavings.toLocaleString()}</h4>
+                                        <p className="text-muted mb-1 small">Total Savings</p>
+                                        <h6 className={`mb-0 fw-normal ${safeTotalSavings >= 0 ? 'text-primary' : 'text-danger'}`}>
+                                            LKR {safeTotalSavings.toLocaleString()}
+                                        </h6>
                                     </div>
-                                    <div className="bg-primary-100 p-3 rounded">
-                                        <i className="ri-piggy-bank-line text-primary text-2xl"></i>
+                                    <div className={safeTotalSavings >= 0 ? 'text-primary' : 'text-danger'}>
+                                        <i className="ri-piggy-bank-line text-lg"></i>
                                     </div>
                                 </div>
                             </div>
@@ -111,20 +132,74 @@ const UnitCountEight = () => {
                     <div className="card">
                         <div className="card-body text-center py-5">
                             <div className="mb-3">
-                                <i className="ri-dashboard-line text-4xl text-secondary-light"></i>
+                                <i className="ri-dashboard-line text-3xl text-muted"></i>
                             </div>
-                            <h6 className="text-lg text-secondary-light mb-2">No Financial Data</h6>
-                            <p className="text-sm text-secondary-light mb-3">
+                            <h6 className="text-muted mb-2 small">No Financial Data</h6>
+                            <p className="text-muted mb-3 small">
                                 Start adding income and expenses to see your financial overview.
                             </p>
                             <div className="d-flex justify-content-center gap-3">
-                                <Link to="/form-validation" className="btn btn-outline-success btn-sm">
+                                <Link 
+                                    to="/form-validation" 
+                                    className="btn btn-outline-success btn-sm"
+                                    style={{
+                                        borderRadius: '6px',
+                                        padding: '8px 16px',
+                                        fontWeight: '500',
+                                        transition: 'all 0.2s ease',
+                                        borderWidth: '1.5px'
+                                    }}
+                                    onMouseOver={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(-1px)';
+                                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(25, 135, 84, 0.2)';
+                                    }}
+                                    onMouseOut={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(0)';
+                                        e.currentTarget.style.boxShadow = 'none';
+                                    }}
+                                >
                                     <i className="ri-add-line me-2"></i>Add Income
                                 </Link>
-                                <Link to="/form-validation" className="btn btn-outline-primary btn-sm">
+                                <Link 
+                                    to="/form-validation" 
+                                    className="btn btn-outline-primary btn-sm"
+                                    style={{
+                                        borderRadius: '6px',
+                                        padding: '8px 16px',
+                                        fontWeight: '500',
+                                        transition: 'all 0.2s ease',
+                                        borderWidth: '1.5px'
+                                    }}
+                                    onMouseOver={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(-1px)';
+                                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(13, 110, 253, 0.2)';
+                                    }}
+                                    onMouseOut={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(0)';
+                                        e.currentTarget.style.boxShadow = 'none';
+                                    }}
+                                >
                                     <i className="ri-add-line me-2"></i>Add Expense
                                 </Link>
-                                <button className="btn btn-outline-info btn-sm" onClick={showChatGuide}>
+                                <button 
+                                    className="btn btn-outline-info btn-sm" 
+                                    onClick={showChatGuide}
+                                    style={{
+                                        borderRadius: '6px',
+                                        padding: '8px 16px',
+                                        fontWeight: '500',
+                                        transition: 'all 0.2s ease',
+                                        borderWidth: '1.5px'
+                                    }}
+                                    onMouseOver={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(-1px)';
+                                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(13, 202, 240, 0.2)';
+                                    }}
+                                    onMouseOut={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(0)';
+                                        e.currentTarget.style.boxShadow = 'none';
+                                    }}
+                                >
                                     <i className="ri-chat-1-line me-2"></i>Use Chat
                                 </button>
                             </div>

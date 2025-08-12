@@ -775,6 +775,22 @@ def store_in_database(data):
             category = Category(name=data['category'], type=data['type'])
             db.session.add(category)
 
+        # Parse time from structured data or use current time
+        transaction_time = None
+        if data.get('time'):
+            try:
+                # Parse time string (HH:MM format) to time object
+                time_parts = data['time'].split(':')
+                if len(time_parts) == 2:
+                    hour, minute = int(time_parts[0]), int(time_parts[1])
+                    transaction_time = datetime.strptime(f"{hour:02d}:{minute:02d}", '%H:%M').time()
+                else:
+                    transaction_time = datetime.now().time()
+            except (ValueError, TypeError):
+                transaction_time = datetime.now().time()
+        else:
+            transaction_time = datetime.now().time()
+
         # Create a new Transaction ORM object
         new_transaction = Transaction(
             user_id=data['user_id'],
@@ -784,7 +800,7 @@ def store_in_database(data):
             price=int(data.get('price', 0)),
             date=datetime.strptime(data['date'], '%Y-%m-%d').date(),
             location=data.get('location'),
-            timestamp=datetime.now().time(),
+            timestamp=transaction_time,
             latitude=data.get('latitude'),
             longitude=data.get('longitude')
         )
@@ -884,7 +900,7 @@ def get_transaction_insights(user_id, transaction_data):
         # Seasonal offers (monthly) - Updated for correct Sri Lankan dates
         seasonal_offers = {
             1: ["🎊 New Year sales at supermarkets and electronics stores", "📱 Mobile phone deals and promotions"],
-            2: ["🇱🇰 Independence Day (Feb 4) - patriotic merchandise and cultural items", "💝 Valentine's Day offers on dining and entertainment"],
+            2: ["🇱�� Independence Day (Feb 4) - patriotic merchandise and cultural items", "💝 Valentine's Day offers on dining and entertainment"],
             3: ["📚 Back-to-school promotions on educational materials", "🎒 Stationery and uniform sales"],
             4: ["🌺 Avurudu season - traditional food (kavum, kokis) and clothing (osariya, sarong)", "🏠 Home decoration and cleaning supplies"],
             5: ["🕯️ Vesak season - religious items and decorations", "🌱 Plant and flower sales"],

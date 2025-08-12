@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, MessageCircle, Bot, Send, Mic, Check, X as XIcon, AlertTriangle, TrendingUp, TrendingDown, DollarSign, Calendar, MapPin } from "lucide-react";
 import styles from './ChatBotPopup.module.css';
+import Swal from 'sweetalert2';
 
 const ChatBotPopup = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -18,9 +19,19 @@ const ChatBotPopup = () => {
   const [pendingTransaction, setPendingTransaction] = useState(null);
   const [isConfirming, setIsConfirming] = useState(false);
   
-  // Add refs for voice recognition
+  // Add refs for voice recognition and scrolling
   const recognitionRef = useRef(null);
   const isListeningRef = useRef(false);
+  const messagesEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  // Scroll to bottom whenever messages change
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   const toggleChat = () => {
     setIsOpen(!isOpen);
@@ -106,14 +117,59 @@ const ChatBotPopup = () => {
 
       const result = await response.json();
       
-      // Add success message
+      // Show success notification with SweetAlert2
+      Swal.fire({
+        icon: 'success',
+        title: 'Transaction Saved! 🎉',
+        text: `Your transaction has been successfully recorded with ID: ${result.transaction_id}`,
+        timer: 3000,
+        showConfirmButton: false,
+        toast: true,
+        position: 'top-end'
+      });
+
+      // Add success message to chat
       setMessages(prev => [...prev, { 
         text: `✅ Transaction saved successfully! ID: ${result.transaction_id}`,
         isBot: true 
       }]);
 
-      // Clear pending transaction
+      // Clear pending transaction and close the review card
       setPendingTransaction(null);
+      
+      // Update the message that contains structuredData to remove it (close review card)
+      setMessages(prev => {
+        const newMessages = [...prev];
+        // Find the message that contains structuredData and remove it
+        const messageIndex = newMessages.findIndex(msg => msg.structuredData);
+        console.log('Found message with structuredData at index:', messageIndex);
+        console.log('Messages before update:', newMessages);
+        
+        if (messageIndex !== -1) {
+          // Create a new message object without structuredData
+          const updatedMessage = { ...newMessages[messageIndex] };
+          delete updatedMessage.structuredData;
+          delete updatedMessage.insights;
+          delete updatedMessage.suggestions;
+          delete updatedMessage.budgetAlerts;
+          delete updatedMessage.aiSuggestions;
+          delete updatedMessage.transactionInsights;
+          
+          // Update the message in the array
+          newMessages[messageIndex] = updatedMessage;
+          console.log('Message after removing structuredData:', newMessages[messageIndex]);
+        } else {
+          console.log('No message with structuredData found');
+        }
+        
+        console.log('Messages after update:', newMessages);
+        return newMessages;
+      });
+
+      // Scroll to bottom after a short delay to ensure the new message is rendered
+      setTimeout(() => {
+        scrollToBottom();
+      }, 100);
 
     } catch (error) {
       setError(error.message);
@@ -130,16 +186,23 @@ const ChatBotPopup = () => {
     // Clear the pending transaction
     setPendingTransaction(null);
     
-    // Update the last message to remove structuredData (review card)
+    // Update the message that contains structuredData to remove it (close review card)
     setMessages(prev => {
       const newMessages = [...prev];
-      if (newMessages.length > 0) {
-        const lastMessage = newMessages[newMessages.length - 1];
-        if (lastMessage.structuredData) {
-          // Remove structuredData to hide the review card
-          const { structuredData, ...messageWithoutData } = lastMessage;
-          newMessages[newMessages.length - 1] = messageWithoutData;
-        }
+      // Find the message that contains structuredData and remove it
+      const messageIndex = newMessages.findIndex(msg => msg.structuredData);
+      if (messageIndex !== -1) {
+        // Create a new message object without structuredData
+        const updatedMessage = { ...newMessages[messageIndex] };
+        delete updatedMessage.structuredData;
+        delete updatedMessage.insights;
+        delete updatedMessage.suggestions;
+        delete updatedMessage.budgetAlerts;
+        delete updatedMessage.aiSuggestions;
+        delete updatedMessage.transactionInsights;
+        
+        // Update the message in the array
+        newMessages[messageIndex] = updatedMessage;
       }
       
       // Add cancellation message
@@ -487,6 +550,25 @@ const ChatBotPopup = () => {
                 }}
               />
             </div>
+            <div className={styles.detailRow}>
+              <span className={styles.label}>Time:</span>
+              <input 
+                type="time" 
+                defaultValue={data.time || "12:00"} 
+                className={styles.editableField}
+                onChange={(e) => {
+                  if (pendingTransaction) {
+                    setPendingTransaction({
+                      ...pendingTransaction,
+                      structured_data: {
+                        ...pendingTransaction.structured_data,
+                        time: e.target.value
+                      }
+                    });
+                  }
+                }}
+              />
+            </div>
             {data.location && (
               <div className={styles.detailRow}>
                 <span className={styles.label}>Location:</span>
@@ -780,6 +862,8 @@ const ChatBotPopup = () => {
                 </div>
               )}
               {error && <div className={styles.error}>{error}</div>}
+              {/* Invisible element for scrolling to bottom */}
+              <div ref={messagesEndRef} />
             </div>
 
             <div className={styles.inputContainer}>

@@ -122,11 +122,21 @@ const TransactionForm = () => {
             }
 
             MySwal.fire({
-                title: <strong>Success!</strong>,
-                html: <p>Transaction recorded</p>,
+                title: 'Transaction Saved! 🎉',
+                html: `
+                    <div class="text-center">
+                        <p class="mb-3">Your transaction has been successfully recorded!</p>
+                        <div class="bg-light p-3 rounded">
+                            <strong>Details:</strong><br>
+                            <span class="text-success">${formData.item}</span> - LKR ${formData.price}<br>
+                            <span class="text-muted">${formData.category} (${formData.type})</span>
+                        </div>
+                    </div>
+                `,
                 icon: 'success',
                 confirmButtonColor: '#28a745',
-                timer: 2000
+                confirmButtonText: 'Great!',
+                timer: 3000
             });
 
             // Reset form while maintaining category/type selection
@@ -256,9 +266,25 @@ const TransactionForm = () => {
                         {/* Submit Button */}
                         <div className="col-12 mt-4">
                             <button 
-                                className="btn btn-primary-600 d-flex align-items-center justify-content-center gap-2" 
+                                className="btn btn-primary d-flex align-items-center justify-content-center gap-2" 
                                 type="submit"
-                                style={{ width: '200px', margin: '0 auto' }}
+                                style={{ 
+                                    width: '200px', 
+                                    margin: '0 auto',
+                                    borderRadius: '8px',
+                                    padding: '12px 24px',
+                                    fontWeight: '500',
+                                    transition: 'all 0.2s ease',
+                                    boxShadow: '0 2px 8px rgba(13, 110, 253, 0.15)'
+                                }}
+                                onMouseOver={(e) => {
+                                    e.currentTarget.style.transform = 'translateY(-1px)';
+                                    e.currentTarget.style.boxShadow = '0 4px 16px rgba(13, 110, 253, 0.25)';
+                                }}
+                                onMouseOut={(e) => {
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(13, 110, 253, 0.15)';
+                                }}
                             >
                                 <Icon icon="material-symbols:send" className="fs-5" />
                                 <span>Submit Transaction</span>
