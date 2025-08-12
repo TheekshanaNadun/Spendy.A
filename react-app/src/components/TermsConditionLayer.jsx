@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 
 const TermsConditionLayer = () => {
   const [expandedSection, setExpandedSection] = useState(null);
-  const [accepted, setAccepted] = useState(false);
 
   const sections = [
     {
@@ -126,52 +125,7 @@ const TermsConditionLayer = () => {
         ))}
       </div>
 
-      <div style={{
-        marginTop: '40px',
-        padding: '20px',
-        backgroundColor: '#f8f9fa',
-        borderRadius: '8px'
-      }}>
-        <label style={{
-          display: 'flex',
-          alignItems: 'center',
-          marginBottom: '20px',
-          cursor: 'pointer'
-        }}>
-          <input
-            type="checkbox"
-            checked={accepted}
-            onChange={(e) => setAccepted(e.target.checked)}
-            style={{
-              marginRight: '12px',
-              width: '20px',
-              height: '20px'
-            }}
-          />
-          <span style={{
-            fontSize: '16px',
-            color: '#1a2b4e'
-          }}>I have read and agree to these Terms and Conditions</span>
-        </label>
 
-        <button
-          disabled={!accepted}
-          style={{
-            width: '100%',
-            padding: '16px',
-            backgroundColor: accepted ? '#1a2b4e' : '#cbd5e0',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '16px',
-            fontWeight: '600',
-            cursor: accepted ? 'pointer' : 'not-allowed',
-            transition: 'background-color 0.3s ease'
-          }}
-        >
-          Accept and Continue
-        </button>
-      </div>
     </div>
   );
 };

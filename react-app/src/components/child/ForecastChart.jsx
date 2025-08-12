@@ -9,6 +9,38 @@ const ForecastChart = () => {
   if (forecastError) return <div className="text-danger">{forecastError}</div>;
   if (!forecastData) return <div>No forecast data available.</div>;
 
+  // Check if there's enough data to display meaningful forecast
+  const hasData = forecastData.income && forecastData.income.length > 0 && forecastData.expense && forecastData.expense.length > 0;
+  
+  if (!hasData) {
+    return (
+      <div className="card radius-16">
+        <div className="card-header">
+          <h6 className="mb-2 fw-bold text-lg mb-0">Next 30 Days Forecast</h6>
+        </div>
+        <div className="card-body">
+          <div className="text-center py-5">
+            <div className="mb-3">
+              <i className="ri-line-chart-line text-4xl text-secondary-light"></i>
+            </div>
+            <h6 className="text-lg text-secondary-light mb-2">No Forecast Data Available</h6>
+            <p className="text-sm text-secondary-light mb-3">
+              Start adding transactions to enable AI-powered financial forecasting.
+            </p>
+            <div className="d-flex justify-content-center gap-3">
+              <button className="btn btn-primary btn-sm">
+                <i className="ri-add-line me-2"></i>Add Income
+              </button>
+              <button className="btn btn-outline-primary btn-sm">
+                <i className="ri-add-line me-2"></i>Add Expense
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Helper to round to 2 decimals
   const round2 = (num) => Math.round((num + Number.EPSILON) * 100) / 100;
 

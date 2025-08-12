@@ -21,7 +21,37 @@ const BalanceStatistic = () => {
   if (error) return <div className="text-danger">{error}</div>;
   if (!dashboardData) return <div className="text-secondary">No data available.</div>;
 
+  // Destructure data first
   const { months, monthlyIncome, monthlyExpense } = dashboardData;
+
+  // Check if there's enough data to display meaningful statistics
+  const hasData = monthlyIncome && monthlyIncome.length > 0 && monthlyExpense && monthlyExpense.length > 0;
+  
+  if (!hasData) {
+    return (
+      <div className='col-12'>
+        <div className='card h-100'>
+          <div className='card-body'>
+            <div className='d-flex align-items-center flex-wrap gap-2 justify-content-between'>
+              <h6 className='mb-2 fw-bold text-lg mb-0'>Balance Statistic</h6>
+            </div>
+            <div className="text-center py-5">
+              <div className="mb-3">
+                <i className="ri-line-chart-line text-4xl text-secondary-light"></i>
+              </div>
+              <h6 className="text-lg text-secondary-light mb-2">No Balance Data Available</h6>
+              <p className="text-sm text-secondary-light mb-3">
+                Start tracking your monthly income and expenses to see your balance statistics.
+              </p>
+              <button className="btn btn-primary btn-sm">
+                <i className="ri-add-line me-2"></i>Add Transaction
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const lastIncome = safeNumber(monthlyIncome?.[monthlyIncome.length - 1]);
   const lastExpense = safeNumber(monthlyExpense?.[monthlyExpense.length - 1]);

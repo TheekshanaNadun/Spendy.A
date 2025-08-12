@@ -55,8 +55,10 @@ db.init_app(app)
 
 load_dotenv()
 
-KLUSTER_API_URL = "https://api.kluster.ai/v1/chat/completions"
-KLUSTER_API_KEY = os.getenv("KLUSTER_API_KEY")
+import anthropic
+
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 def verify_auth():
     try:
@@ -341,18 +343,138 @@ def classify_message_type(message):
         # Default to transaction if unclear
         return 'transaction'
 
+def get_seasonal_promotions(date):
+    """Get seasonal and festival-specific promotions based on current date"""
+    month = date.month
+    day = date.day
+    
+    promotions = []
+    
+    # Sri Lankan Independence Day - February 4th
+    if month == 2 and 1 <= day <= 10:
+        promotions.append("🇱🇰 Independence Day season - Look for patriotic merchandise, cultural items, and special sales at local shops")
+    
+    # Sri Lankan New Year (Avurudu) - usually around April 13-14
+    if month == 4 and 10 <= day <= 20:
+        promotions.append("🌺 Avurudu season is here! Look for traditional food (kavum, kokis), clothing (osariya, sarong), and cultural items at special prices")
+    
+    # Vesak - usually in May
+    if month == 5 and 1 <= day <= 31:
+        promotions.append("🕯️ Vesak season - Visit temple shops for religious items, lanterns, and traditional decorations at discounted prices")
+    
+    # Deepavali - usually in October/November
+    if month == 10 and day >= 20 or month == 11 and day <= 15:
+        promotions.append("🪔 Deepavali season - Sweet shops and traditional item stores offer special festival discounts")
+    
+    # Christmas season - December
+    if month == 12 and day >= 15:
+        promotions.append("🎄 Christmas season - Major retailers offer festive discounts on gifts, decorations, and seasonal items")
+    
+    # Monsoon season (May to September) - indoor shopping promotions
+    if month in [5, 6, 7, 8, 9]:
+        promotions.append("🌧️ Monsoon season - Indoor shopping centers offer special promotions to attract customers during rainy weather")
+    
+    # Tourist season (December to April) - beach and tourism promotions
+    if month in [12, 1, 2, 3, 4]:
+        promotions.append("🏖️ Tourist season - Beach resorts, restaurants, and entertainment venues offer special local rates")
+    
+    # School holiday promotions (April, August, December)
+    if month in [4, 8, 12] and 15 <= day <= 31:
+        promotions.append("🎒 School holidays - Educational materials, toys, and family entertainment venues offer special promotions")
+    
+    # Add current month specific promotions
+    if month == 4:
+        if 1 <= day <= 9:
+            promotions.append("🌺 Pre-Avurudu season - Start shopping for traditional items and new clothes")
+        elif 10 <= day <= 20:
+            promotions.append("🌺 Avurudu season is here! Look for traditional food (kavum, kokis), clothing (osariya, sarong), and cultural items at special prices")
+        elif 21 <= day <= 30:
+            promotions.append("🌺 Post-Avurudu season - Look for remaining traditional items at discounted prices")
+    
+    return promotions
+
+def get_category_specific_promotions(category, current_date):
+    """Get category-specific promotions based on the item category"""
+    month = current_date.month
+    day = current_date.day
+    
+    promotions = []
+    
+    if 'clothing' in category.lower() or 'textile' in category.lower():
+        if month == 4 and 10 <= day <= 20:
+            promotions.append("👗 Avurudu season - Traditional clothing (osariya, sarong) at special prices")
+        elif month == 12 and day >= 15:
+            promotions.append("🎄 Christmas season - New year clothing sales and fashion discounts")
+        elif month in [6, 7, 8]:
+            promotions.append("🌞 Summer season - Light clothing and beachwear promotions")
+        else:
+            promotions.append("👕 Regular clothing sales - Check local markets (pola) for better prices")
+    
+    elif 'food' in category.lower() or 'grocery' in category.lower():
+        if month == 4 and 10 <= day <= 20:
+            promotions.append("🍯 Avurudu season - Traditional sweets (kavum, kokis) and festive foods")
+        elif month == 5:
+            promotions.append("🕯️ Vesak season - Special vegetarian meal promotions")
+        else:
+            promotions.append("🛒 Shop at local markets (pola) for fresh produce at 20-30% lower prices")
+    
+    elif 'transport' in category.lower():
+        promotions.append("🚌 Use public transport to save on fuel costs")
+        promotions.append("🚗 Consider carpooling for long-distance travel")
+    
+    elif 'education' in category.lower():
+        if month in [3, 9]:
+            promotions.append("📚 Back-to-school season - Educational materials at competitive prices")
+        else:
+            promotions.append("📖 Check for student discounts and bulk purchase offers")
+    
+    return promotions
+
+def get_smart_date_context(message, default_date=None):
+    """Extract date context from message or use today's date as default"""
+    if default_date is None:
+        default_date = datetime.now().date()
+    
+    message_lower = message.lower()
+    
+    # Check for specific date mentions
+    if 'today' in message_lower or 'now' in message_lower:
+        return default_date
+    elif 'yesterday' in message_lower:
+        return default_date - timedelta(days=1)
+    elif 'tomorrow' in message_lower:
+        return default_date + timedelta(days=1)
+    elif 'this week' in message_lower:
+        return default_date
+    elif 'last week' in message_lower:
+        return default_date - timedelta(days=7)
+    elif 'next week' in message_lower:
+        return default_date + timedelta(days=7)
+    elif 'this month' in message_lower:
+        return default_date
+    elif 'last month' in message_lower:
+        return default_date.replace(day=1) - timedelta(days=1)
+    elif 'next month' in message_lower:
+        if default_date.month == 12:
+            return default_date.replace(year=default_date.year + 1, month=1, day=1)
+        else:
+            return default_date.replace(month=default_date.month + 1, day=1)
+    
+    # If no specific date mentioned, use today's date
+    return default_date
+
 def get_sri_lankan_market_insights(user_id):
     """Get Sri Lankan market-specific insights and suggestions"""
     try:
         today = datetime.now().date()
         first_day_month = today.replace(day=1)
-        last_month = (first_day_month - timedelta(days=1)).replace(day=1)
+        last_day_month = (first_day_month - timedelta(days=1)).replace(day=1)
         
         # Get last month's total expenses
         last_month_expenses = db.session.query(func.sum(Transaction.price)).filter(
             Transaction.user_id == user_id,
             Transaction.type == 'Expense',
-            Transaction.date >= last_month,
+            Transaction.date >= last_day_month,
             Transaction.date < first_day_month
         ).scalar() or 0
         
@@ -364,6 +486,7 @@ def get_sri_lankan_market_insights(user_id):
         ).scalar() or 0
         
         # Sri Lankan market insights
+        # Note: 'today' refers to the transaction date, but promotions should always be current
         current_month = today.month
         current_day = today.day
         
@@ -371,53 +494,77 @@ def get_sri_lankan_market_insights(user_id):
             'last_month_total': last_month_expenses,
             'today_expenses': today_expenses,
             'current_date': today.strftime('%Y-%m-%d'),
+            'transaction_month': today.month,  # Month when transaction occurred
+            'current_month': datetime.now().month,  # Current month for promotions
             'suggestions': []
         }
         
-        # Monthly promotions and tips
+        # Enhanced Sri Lankan monthly promotions and cultural events
         monthly_promotions = {
-            1: "New Year sales at supermarkets and electronics stores",
-            2: "Valentine's Day offers on dining and entertainment",
-            3: "Back-to-school promotions on educational materials",
-            4: "Avurudu season - traditional food and clothing sales",
-            5: "Vesak season - religious items and decorations",
-            6: "Mid-year sales at major retailers",
-            7: "Esala Perahera season - cultural items",
-            8: "Independence Day sales",
-            9: "Back-to-school season - stationery and uniforms",
-            10: "Deepavali season - sweets and traditional items",
-            11: "Christmas season - gifts and decorations",
-            12: "Year-end sales and clearance"
+            1: "🎊 New Year sales at supermarkets, electronics stores, and clothing shops across Sri Lanka",
+            2: "🇱🇰 Independence Day (Feb 4) - patriotic merchandise, cultural items, and special sales at local shops",
+            3: "📚 Back-to-school promotions on educational materials, uniforms, and stationery nationwide",
+            4: "🌺 Avurudu season - traditional food (kavum, kokis), clothing (osariya, sarong), and cultural items sales",
+            5: "🕯️ Vesak season - religious items, lanterns, and traditional decorations at temple shops",
+            6: "🏪 Mid-year sales at major retailers like ODEL, House of Fashion, and local markets",
+            7: "🐘 Esala Perahera season - cultural items, traditional clothing, and souvenir shops in Kandy",
+            8: "🌞 August - Beach season promotions at coastal resorts and water sports centers",
+            9: "🎒 Back-to-school season - stationery, uniforms, and educational materials at competitive prices",
+            10: "🪔 Deepavali season - sweets (mithai), traditional items, and festive decorations",
+            11: "🎄 Christmas season - gifts, decorations, and festive items at major retailers",
+            12: "🎯 Year-end sales and clearance at all major shopping centers and local markets"
         }
         
-        # Weekly promotions
+        # Enhanced Sri Lankan weekly promotions with local context
         weekly_promotions = {
-            0: "Sunday - Family day discounts at restaurants",
-            1: "Monday - Fresh produce discounts at markets",
-            2: "Tuesday - Electronics and gadget deals",
-            3: "Wednesday - Clothing and fashion sales",
-            4: "Thursday - Home and kitchen appliance offers",
-            5: "Friday - Weekend grocery specials",
-            6: "Saturday - Entertainment and leisure discounts"
+            0: "🌅 Sunday - Family day discounts at restaurants, beach resorts, and entertainment venues",
+            1: "🌱 Monday - Fresh produce discounts at local markets (pola) and vegetable shops",
+            2: "💻 Tuesday - Electronics and gadget deals at tech shops in Pettah and major cities",
+            3: "👗 Wednesday - Clothing and fashion sales at textile shops and boutiques",
+            4: "🏠 Thursday - Home and kitchen appliance offers at appliance stores",
+            5: "🛒 Friday - Weekend grocery specials at supermarkets and local markets",
+            6: "🎭 Saturday - Entertainment and leisure discounts at cinemas and recreational centers"
         }
         
-        # Add current month promotion
-        if current_month in monthly_promotions:
-            insights['suggestions'].append(f"💡 {monthly_promotions[current_month]}")
-        
-        # Add current day promotion
+        # Enhanced date-aware promotions and suggestions
+        current_month = today.month
+        current_day = today.day
         current_weekday = today.weekday()
-        if current_weekday in weekly_promotions:
-            insights['suggestions'].append(f"📅 {weekly_promotions[current_weekday]}")
         
-        # Budget-based suggestions
+        # Add current month promotion with enhanced context (always current month)
+        current_month_now = datetime.now().month
+        if current_month_now in monthly_promotions:
+            insights['suggestions'].append(f"💡 {monthly_promotions[current_month_now]}")
+        
+        # Add current day promotion with local context (always current day)
+        current_weekday_now = datetime.now().weekday()
+        if current_weekday_now in weekly_promotions:
+            insights['suggestions'].append(f"📅 {weekly_promotions[current_weekday_now]}")
+        
+        # Add seasonal and festival-specific promotions based on current date (not transaction date)
+        # Always use current date for promotions to show relevant current offers
+        current_date = datetime.now().date()
+        seasonal_promotions = get_seasonal_promotions(current_date)
+        if seasonal_promotions:
+            insights['suggestions'].extend(seasonal_promotions)
+        
+        # Add general seasonal promotions based on current date
+        # Category-specific promotions will be handled in the main transaction processing
+        seasonal_promotions = get_seasonal_promotions(current_date)
+        if seasonal_promotions:
+            insights['suggestions'].extend(seasonal_promotions)
+        
+        # Smart budget-based suggestions with Sri Lankan context
         if last_month_expenses > 50000:
-            insights['suggestions'].append("💰 Your last month expenses were high. Consider setting stricter budgets this month.")
+            insights['suggestions'].append("💰 Your last month expenses were high. Consider setting stricter budgets this month. Try shopping at local markets (pola) for better prices.")
         elif last_month_expenses < 20000:
-            insights['suggestions'].append("🎉 Great job! Your last month expenses were well controlled.")
+            insights['suggestions'].append("🎉 Great job! Your last month expenses were well controlled. Keep up the good financial habits!")
         
+        # Daily spending guidance with local context
         if today_expenses > 2000:
-            insights['suggestions'].append("⚠️ Today's expenses are high. Consider reducing spending for the rest of the day.")
+            insights['suggestions'].append("⚠️ Today's expenses are high. Consider reducing spending for the rest of the day. Try cooking at home instead of eating out.")
+        elif today_expenses > 0:
+            insights['suggestions'].append("✅ Good spending control today! Consider using public transport to save on fuel costs.")
         
         # Sri Lankan specific tips
         sri_lankan_tips = [
@@ -448,32 +595,52 @@ def get_sri_lankan_market_insights(user_id):
             'suggestions': ["💡 Consider shopping at local markets for better prices", "🚌 Use public transport to save on fuel"]
         }
 
-def call_kluster_api(message, user_context=None, message_type='transaction'):
-    """Enhanced AI processing with message type classification"""
+def call_anthropic_api(message, user_context=None, message_type='transaction'):
+    """Enhanced AI processing with message type classification using Anthropic Claude"""
     
     if message_type == 'question':
         # Handle questions with Sri Lankan market insights
         system_prompt = (
-            "You are a financial advisor specializing in Sri Lankan markets and personal finance. "
-            "Provide helpful, practical advice based on Sri Lankan context, including: "
-            "- Local market promotions and sales periods "
-            "- Sri Lankan banking and financial services "
-            "- Local shopping tips and cost-saving strategies "
-            "- Seasonal promotions and cultural events "
-            "- Public transport and utility cost optimization "
-            "Respond with practical, actionable advice in a friendly, helpful tone."
+            f"You are a financial advisor specializing in Sri Lankan markets and personal finance. "
+            f"IMPORTANT: Always provide advice based on the CURRENT date ({datetime.now().strftime('%Y-%m-%d')}) and current month ({datetime.now().strftime('%B')}). "
+            f"Provide helpful, practical advice based on Sri Lankan context, including: "
+            f"- Current seasonal promotions and sales periods for {datetime.now().strftime('%B')} "
+            f"- Sri Lankan banking and financial services "
+            f"- Local shopping tips and cost-saving strategies "
+            f"- Current seasonal promotions and cultural events "
+            f"- Public transport and utility cost optimization "
+            f"Respond with practical, actionable advice in a friendly, helpful tone. "
+            f"Always mention the current month and season when giving advice."
         )
         
-        payload = {
-            "model": "klusterai/Meta-Llama-3.3-70B-Instruct-Turbo",
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": message}
-            ],
-            "temperature": 0.7,
-            "top_p": 0.9,
-            "stream": False
-        }
+        try:
+            response = client.messages.create(
+                model="claude-3-haiku-20240307",
+                max_tokens=1000,
+                temperature=0.7,
+                system=system_prompt,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": message
+                            }
+                        ]
+                    }
+                ]
+            )
+            return {
+                "choices": [{
+                    "message": {
+                        "content": response.content[0].text
+                    }
+                }]
+            }
+        except Exception as e:
+            logger.error(f"Error calling Anthropic API for question: {e}")
+            return None
     else:
         # Handle transactions with enhanced context
         user_context_str = ""
@@ -485,7 +652,7 @@ def call_kluster_api(message, user_context=None, message_type='transaction'):
             - Preferred locations: {[loc for loc, _ in user_context.get('top_locations', [])]}
             """
         
-    system_prompt = (
+        system_prompt = (
             f"You are an intelligent financial assistant for Spendy.AI. Analyze the user's message and extract structured transaction data. "
             f"{user_context_str}"
             f"Consider the user's spending patterns and provide personalized insights. "
@@ -498,41 +665,48 @@ def call_kluster_api(message, user_context=None, message_type='transaction'):
             f"'Income Tax', 'Salary', 'Foreign Remittances', 'Rental Income', 'Agricultural Income', 'Business Profits', "
             f"'Investment Returns', 'Government Allowances', 'Freelance Income'. "
             f"The 'date' must be in 'YYYY-MM-DD' format. "
+            f"IMPORTANT: If no specific date is mentioned in the user's message, use today's current date ({datetime.now().strftime('%Y-%m-%d')}). "
+            f"Do NOT use past dates unless explicitly mentioned by the user. "
             f"The 'price' must be an integer. The 'type' must be either 'Income' or 'Expense'. "
             f"The 'suggestions' should be an array of helpful tips or alternatives. "
             f"If a value is not available, use null for that key."
-    )
+        )
         
-    payload = {
-        "model": "klusterai/Meta-Llama-3.3-70B-Instruct-Turbo",
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": message}
-        ],
-            "temperature": 0.1,
-        "top_p": 0.9,
-        "stream": False
-    }
-    
-    headers = {
-        "Authorization": f"Bearer {KLUSTER_API_KEY}",
-        "Content-Type": "application/json"
-    }
+        try:
+            response = client.messages.create(
+                model="claude-3-haiku-20240307",
+                max_tokens=1000,
+                temperature=0.1,
+                system=system_prompt,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": message
+                            }
+                        ]
+                    }
+                ]
+            )
+            return {
+                "choices": [{
+                    "message": {
+                        "content": response.content[0].text
+                    }
+                }]
+            }
+        except Exception as e:
+            logger.error(f"Error calling Anthropic API for transaction: {e}")
+            return None
 
-    try:
-        response = requests.post(KLUSTER_API_URL, json=payload, headers=headers)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error calling Kluster API: {e}")
-        return None
-
-def parse_kluster_response(response, message_type='transaction'):
+def parse_anthropic_response(response, message_type='transaction'):
     try:
         if not response or 'choices' not in response:
-            raise ValueError("Invalid Kluster API response: Missing 'choices'")
+            raise ValueError("Invalid Anthropic API response: Missing 'choices'")
         content = response["choices"][0]["message"]["content"]
-        logger.debug(f"Kluster API response content: {content}")
+        logger.debug(f"Anthropic API response content: {content}")
         if message_type == 'question':
             return {
                 'type': 'question_response',
@@ -550,6 +724,21 @@ def parse_kluster_response(response, message_type='transaction'):
                 # Handle null or missing date - use current date as default
                 if not parsed_data.get('date'):
                     parsed_data['date'] = datetime.now().strftime('%Y-%m-%d')
+                    logger.info(f"No date provided, using current date: {parsed_data['date']}")
+                
+                # Validate and correct dates - if date is in the past and not explicitly mentioned, use current date
+                try:
+                    parsed_date = datetime.strptime(parsed_data['date'], '%Y-%m-%d').date()
+                    current_date = datetime.now().date()
+                    
+                    # If the parsed date is more than 30 days in the past and no explicit mention in message
+                    if parsed_date < current_date - timedelta(days=30):
+                        logger.info(f"Correcting past date {parsed_data['date']} to current date {current_date.strftime('%Y-%m-%d')}")
+                        parsed_data['date'] = current_date.strftime('%Y-%m-%d')
+                except ValueError:
+                    # If date parsing fails, use current date
+                    logger.warning(f"Invalid date format {parsed_data['date']}, using current date")
+                    parsed_data['date'] = datetime.now().strftime('%Y-%m-%d')
                 # Set defaults for optional fields if they are missing or null
                 parsed_data.setdefault('location', None)
                 parsed_data.setdefault('timestamp', datetime.now().strftime("%H:%M:%S"))
@@ -562,13 +751,13 @@ def parse_kluster_response(response, message_type='transaction'):
                     'message_type': 'transaction'
                 }
             except json.JSONDecodeError:
-                logger.error(f"Failed to decode JSON from Kluster response: {content}")
+                logger.error(f"Failed to decode JSON from Anthropic response: {content}")
                 return None
             except (ValueError, KeyError) as e:
-                logger.error(f"Error parsing Kluster response: {e}")
+                logger.error(f"Error parsing Anthropic response: {e}")
                 return None
     except Exception as e:
-        logger.error(f"Error in parse_kluster_response: {e}")
+        logger.error(f"Error in parse_anthropic_response: {e}")
         return None
 
 
@@ -692,23 +881,30 @@ def get_transaction_insights(user_id, transaction_data):
         if this_month_expenses > last_month_expenses and last_month_expenses > 0:
             insights['expense_warning'] = f"⚠️ Your total expenses this month ({int(this_month_expenses)} LKR) have exceeded last month's total ({int(last_month_expenses)} LKR). Please review your spending."
         
-        # Seasonal offers (monthly)
+        # Seasonal offers (monthly) - Updated for correct Sri Lankan dates
         seasonal_offers = {
             1: ["🎊 New Year sales at supermarkets and electronics stores", "📱 Mobile phone deals and promotions"],
-            2: ["💝 Valentine's Day offers on dining and entertainment", "🌹 Flower and gift shop discounts"],
+            2: ["🇱🇰 Independence Day (Feb 4) - patriotic merchandise and cultural items", "💝 Valentine's Day offers on dining and entertainment"],
             3: ["📚 Back-to-school promotions on educational materials", "🎒 Stationery and uniform sales"],
-            4: ["🌺 Avurudu season - traditional food and clothing sales", "🏠 Home decoration and cleaning supplies"],
+            4: ["🌺 Avurudu season - traditional food (kavum, kokis) and clothing (osariya, sarong)", "🏠 Home decoration and cleaning supplies"],
             5: ["🕯️ Vesak season - religious items and decorations", "🌱 Plant and flower sales"],
             6: ["🛍️ Mid-year sales at major retailers", "👕 Clothing and fashion clearance"],
-            7: ["🎭 Esala Perahera season - cultural items", "🎪 Traditional costume and accessory sales"],
-            8: ["🇱🇰 Independence Day sales", "🏛️ Patriotic merchandise discounts"],
+            7: ["🎭 Esala Perahera season - cultural items in Kandy", "🎪 Traditional costume and accessory sales"],
+            8: ["🌞 Beach season promotions at coastal resorts", "🏊 Water sports and summer activities"],
             9: ["📖 Back-to-school season - stationery and uniforms", "🎓 University supplies and textbooks"],
-            10: ["🪔 Deepavali season - sweets and traditional items", "🕉️ Religious items and decorations"],
+            10: ["🪔 Deepavali season - sweets (mithai) and traditional items", "🕉️ Religious items and decorations"],
             11: ["🎄 Christmas season - gifts and decorations", "🎁 Toy and electronics sales"],
             12: ["🎊 Year-end sales and clearance", "📱 Electronics and gadget deals"]
         }
         if current_month in seasonal_offers:
             insights['seasonal_offers'] = seasonal_offers[current_month]
+        
+        # Add category-specific promotions based on the transaction category
+        if category:
+            category_promotions = get_category_specific_promotions(category, today)
+            if category_promotions:
+                insights['personalized_suggestions'] = category_promotions
+        
         # Daily offers (special days)
         if current_day == 14 and current_month == 2:
             insights['daily_offers'].append("💕 Valentine's Day - Special romantic dining and gift offers")
@@ -802,11 +998,11 @@ def process_message():
         smart_suggestions = get_smart_suggestions(user_id, message)
 
         # Enhanced AI processing with user context
-        kluster_response = call_kluster_api(message, user_context, message_type='transaction')
-        if not kluster_response:
+        anthropic_response = call_anthropic_api(message, user_context, message_type='transaction')
+        if not anthropic_response:
             return jsonify({"error": "Failed to process transaction"}), 500
 
-        parsed_response = parse_kluster_response(kluster_response, message_type='transaction')
+        parsed_response = parse_anthropic_response(anthropic_response, message_type='transaction')
         if not parsed_response:
             return jsonify({"error": "Failed to parse transaction response"}), 500
 

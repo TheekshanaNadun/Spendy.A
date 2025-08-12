@@ -1,5 +1,7 @@
 import React from "react";
 import { useDashboardData } from "../DashboardDataProvider";
+import { Link } from 'react-router-dom';
+import Swal from 'sweetalert2';
 
 const COLORS = [
   "bg-cyan-600",
@@ -16,6 +18,28 @@ const COLORS = [
 
 const MonthlyExpenseBreakdown = () => {
   const { dashboardData, loading, error } = useDashboardData();
+
+  const showChatGuide = () => {
+    Swal.fire({
+      title: '💡 Use Chat for Easy Expense Tracking!',
+      html: `
+        <div class="text-left">
+          <p class="mb-3">Instead of filling out forms, you can simply chat with our AI assistant:</p>
+          <div class="bg-light p-3 rounded mb-3">
+            <strong>Examples:</strong><br>
+            • "I spent 5000 on groceries today"<br>
+            • "Paid 2000 for transport yesterday"<br>
+            • "Bought lunch for 1500"
+          </div>
+          <p class="text-muted small">Click the chat popup in the bottom right corner to get started!</p>
+        </div>
+      `,
+      icon: 'info',
+      confirmButtonText: 'Got it!',
+      confirmButtonColor: '#3085d6',
+      showCloseButton: true
+    });
+  };
 
   if (loading) return <div className="text-center py-4">Loading...</div>;
   if (error) return <div className="text-danger">{error}</div>;
@@ -57,7 +81,23 @@ const MonthlyExpenseBreakdown = () => {
               );
             })
           ) : (
-            <div className="text-center text-secondary-light">No expense data to display.</div>
+            <div className="text-center py-4">
+              <div className="mb-3">
+                <i className="ri-pie-chart-line text-3xl text-secondary-light"></i>
+              </div>
+              <h6 className="text-sm text-secondary-light mb-2">No Expense Data</h6>
+              <p className="text-xs text-secondary-light mb-3">
+                Start adding expenses to see your monthly breakdown by category.
+              </p>
+              <div className="d-flex justify-content-center gap-3">
+                <Link to="/form-validation" className="btn btn-outline-primary btn-sm">
+                  <i className="ri-add-line me-2"></i>Add Expense
+                </Link>
+                <button className="btn btn-outline-info btn-sm" onClick={showChatGuide}>
+                  <i className="ri-chat-1-line me-2"></i>Use Chat
+                </button>
+              </div>
+            </div>
           )}
         </div>
       </div>

@@ -23,6 +23,9 @@ COPY requirements.txt .
 RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Install additional testing dependencies
+RUN pip install --no-cache-dir pytest pytest-cov pytest-mock coverage
+
 # Copy application code
 COPY . .
 

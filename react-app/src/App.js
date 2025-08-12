@@ -32,6 +32,7 @@ import TableBasicPage from "./pages/TableBasicPage";
 import TableDataPage from "./pages/TableDataPage";
 import TestimonialsPage from "./pages/TestimonialsPage";
 import TermsConditionPage from "./pages/TermsConditionPage";
+import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import ViewProfilePage from "./pages/ViewProfilePage";
 import RouteScrollToTop from "./helper/RouteScrollToTop";
 import { DashboardDataProvider } from "./components/DashboardDataProvider";
@@ -125,6 +126,7 @@ function App() {
           <Route path="/sign-up" element={<SignUpPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/terms-condition" element={<TermsConditionPage />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
 
           {/* Protected Routes */}
           <Route path="/dashboard" element={<ProtectedRoute><DashboardDataProvider><HomePageEleven /></DashboardDataProvider></ProtectedRoute>} />

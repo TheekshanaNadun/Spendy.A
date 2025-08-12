@@ -3997,7 +3997,7 @@ const useReactApexChart = () => {
     yaxis: {
       labels: {
         formatter: function (value) {
-          return "$" + value + "k";
+          return "LKR " + value + "k";
         },
         style: {
           fontSize: "14px",
@@ -4005,8 +4005,14 @@ const useReactApexChart = () => {
       },
     },
     tooltip: {
+      enabled: true,
       x: {
         format: "dd/MM/yy HH:mm",
+      },
+      y: {
+        formatter: function (value) {
+          return "LKR " + value.toLocaleString();
+        },
       },
     },
     legend: {
@@ -4076,7 +4082,7 @@ const useReactApexChart = () => {
     yaxis: {
       labels: {
         formatter: function (value) {
-          return "$" + value + "k";
+          return "LKR " + value + "k";
         },
         style: {
           fontSize: "14px",

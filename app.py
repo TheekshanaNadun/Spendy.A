@@ -3,8 +3,7 @@ from flask_session import Session
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from flask_cors import CORS
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
+
 from datetime import timedelta, datetime
 import hashlib
 import random
@@ -47,11 +46,7 @@ OTP_EXPIRY = 300  # 5 minutes
 
 
 
-limiter = Limiter(
-    app=app,
-    key_func=get_remote_address,
-    default_limits=["1000 per hour", "100 per minute"]
-)
+
 # Configure Flask-Session
 app.config.update(
     SESSION_COOKIE_NAME='spendy_session',
@@ -172,11 +167,7 @@ app.config.update(
 )
 
 mail = Mail(app)
-limiter = Limiter(
-    app=app,
-    key_func=get_remote_address,
-    default_limits=["200 per hour", "50 per minute"]
-)
+
 
 # Modified login route
 @app.route('/api/login', methods=['POST'])
@@ -215,7 +206,6 @@ def login():
 
 # Modified resend OTP route
 @app.route('/api/resend-otp', methods=['POST'])
-@limiter.limit("3/minute")
 def resend_otp():
     try:
         data = request.get_json()
@@ -262,7 +252,6 @@ def send_otp_email(recipient_email, otp):
 from flask import abort
 
 @app.route('/api/verify-otp', methods=['POST'])
-@limiter.limit("5/minute")
 def verify_otp():
     try:
         data = request.get_json()
@@ -904,6 +893,242 @@ def get_expense_summary():
         app.logger.error(f"Error fetching expense summary: {str(e)}")
         return jsonify({"error": "Error retrieving expense summary"}), 500
 
+@app.route('/api/category-budget-status', methods=['GET'])
+@require_login
+def get_category_budget_status():
+    """Get comprehensive budget status for all categories including limits and spending"""
+    try:
+        user_id = session['user_id']
+        app.logger.info(f"Fetching budget status for user_id: {user_id}")
+        
+        today = datetime.utcnow().date()
+        
+        # Get current month range
+        first_day_current_month = today.replace(day=1)
+        if first_day_current_month.month == 12:
+            first_day_next_month = first_day_current_month.replace(year=today.year + 1, month=1)
+        else:
+            first_day_next_month = first_day_current_month.replace(month=today.month + 1)
+        
+        # Get last month range
+        first_day_last_month = (first_day_current_month - timedelta(days=1)).replace(day=1)
+        
+        app.logger.info(f"Date calculation debug:")
+        app.logger.info(f"  today: {today}")
+        app.logger.info(f"  first_day_current_month: {first_day_current_month}")
+        app.logger.info(f"  first_day_next_month: {first_day_next_month}")
+        app.logger.info(f"  first_day_last_month: {first_day_last_month}")
+        
+        app.logger.info(f"Date ranges - Current: {first_day_current_month} to {first_day_next_month}, Last: {first_day_last_month} to {first_day_current_month}")
+        
+        # Get categories that the user actually has transactions for (more efficient)
+        user_categories = db.session.query(
+            Transaction.category
+        ).filter(
+            Transaction.user_id == user_id,
+            Transaction.type == 'Expense'
+        ).distinct().all()
+        
+        app.logger.info(f"Found {len(user_categories)} categories with transactions for user")
+        
+        if not user_categories:
+            app.logger.warning("No expense categories with transactions found for user")
+            return jsonify([]), 200
+        
+        result = []
+        
+        for category_row in user_categories:
+            category_name = category_row.category
+            app.logger.info(f"Processing category: {category_name}")
+            
+            try:
+                # Get user's budget limit for this category
+                # First find the category record to get category_id
+                category_record = Category.query.filter_by(name=category_name).first()
+                monthly_limit = 0
+                
+                if category_record:
+                    # Then find the user's limit for this category
+                    user_limit = UserCategoryLimit.query.filter_by(
+                        user_id=user_id,
+                        category_id=category_record.category_id
+                    ).first()
+                    
+                    if user_limit:
+                        monthly_limit = float(user_limit.monthly_limit)
+                    else:
+                        monthly_limit = 0.0
+                        app.logger.info(f"Category {category_name}: No budget limit set")
+                else:
+                    app.logger.warning(f"Category '{category_name}' not found in Category table")
+                
+                app.logger.info(f"Category {category_name}: monthly_limit = {monthly_limit}")
+                
+                # Debug: Check if user limit exists
+                if user_limit:
+                    app.logger.info(f"Category {category_name}: Found user limit: {user_limit.monthly_limit}")
+                else:
+                    app.logger.info(f"Category {category_name}: No user limit found")
+                
+                # Get current month spending for this category
+                current_month_spending = db.session.query(
+                    func.coalesce(func.sum(Transaction.price), 0)
+                ).filter(
+                    Transaction.user_id == user_id,
+                    Transaction.category == category_name,
+                    Transaction.type == 'Expense',
+                    Transaction.date >= first_day_current_month,
+                    Transaction.date < first_day_next_month
+                ).scalar()
+                
+                # Get last month spending for this category
+                last_month_spending = db.session.query(
+                    func.coalesce(func.sum(Transaction.price), 0)
+                ).filter(
+                    Transaction.user_id == user_id,
+                    Transaction.category == category_name,
+                    Transaction.type == 'Expense',
+                    Transaction.date >= first_day_last_month,
+                    Transaction.date < first_day_current_month
+                ).scalar()
+                
+                app.logger.info(f"Category {category_name}: current_month_spending = {current_month_spending}, last_month_spending = {last_month_spending}")
+                
+                # Debug: Check if there are any transactions for this category
+                all_transactions = Transaction.query.filter(
+                    Transaction.user_id == user_id,
+                    Transaction.category == category_name,
+                    Transaction.type == 'Expense'
+                ).all()
+                app.logger.info(f"Category {category_name}: Total transactions found: {len(all_transactions)}")
+                if all_transactions:
+                    app.logger.info(f"Category {category_name}: Sample transaction dates: {[t.date for t in all_transactions[:3]]}")
+                
+                # Calculate remaining budget - ensure all values are float
+                remaining_budget = float(monthly_limit) - float(current_month_spending)
+                
+                result.append({
+                    'name': category_name,
+                    'limit': float(monthly_limit),
+                    'spent': float(current_month_spending),
+                    'lastMonthSpent': float(last_month_spending)
+                })
+                
+            except Exception as cat_error:
+                app.logger.error(f"Error processing category {category_name}: {str(cat_error)}")
+                # Continue with other categories even if one fails
+                continue
+        
+        # Sort by spending amount (highest first)
+        result.sort(key=lambda x: x['spent'], reverse=True)
+        
+        app.logger.info(f"Final result: {len(result)} categories processed successfully")
+        app.logger.info(f"Result data: {result}")
+        
+        return jsonify(result), 200
+        
+    except Exception as e:
+        import traceback
+        app.logger.error(f"Error fetching category budget status: {str(e)}")
+        app.logger.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({"error": f"Error retrieving category budget status: {str(e)}"}), 500
+
+@app.route('/api/test-categories', methods=['GET'])
+@require_login
+def test_categories():
+    """Test endpoint to verify database connectivity and basic category data"""
+    try:
+        user_id = session['user_id']
+        
+        # Test basic queries
+        categories_count = Category.query.count()
+        expense_categories = Category.query.filter_by(type='Expense').count()
+        user_limits_count = UserCategoryLimit.query.filter_by(user_id=user_id).count()
+        transactions_count = Transaction.query.filter_by(user_id=user_id).count()
+        
+        # Get detailed category information
+        categories = Category.query.filter_by(type='Expense').all()
+        category_details = []
+        for cat in categories:
+            user_limit = UserCategoryLimit.query.filter_by(
+                user_id=user_id,
+                category_id=cat.category_id
+            ).first()
+            
+            category_details.append({
+                'category_id': cat.category_id,
+                'name': cat.name,
+                'type': cat.type,
+                'has_user_limit': user_limit is not None,
+                'limit_amount': float(user_limit.monthly_limit) if user_limit else 0
+            })
+        
+        return jsonify({
+            'status': 'success',
+            'user_id': user_id,
+            'total_categories': categories_count,
+            'expense_categories': expense_categories,
+            'user_limits': user_limits_count,
+            'user_transactions': transactions_count,
+            'category_details': category_details
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        app.logger.error(f"Test endpoint error: {str(e)}")
+        app.logger.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({"error": f"Test failed: {str(e)}"}), 500
+
+@app.route('/api/debug-category-data', methods=['GET'])
+@require_login
+def debug_category_data():
+    """Debug endpoint to see raw database data"""
+    try:
+        user_id = session['user_id']
+        
+        # Get all expense categories
+        categories = Category.query.filter_by(type='Expense').all()
+        
+        # Get all user category limits
+        user_limits = UserCategoryLimit.query.filter_by(user_id=user_id).all()
+        
+        # Get all transactions for this user
+        transactions = Transaction.query.filter_by(user_id=user_id).all()
+        
+        # Get current month transactions
+        today = datetime.utcnow().date()
+        first_day_current_month = today.replace(day=1)
+        if first_day_current_month.month == 12:
+            first_day_next_month = first_day_current_month.replace(year=today.year + 1, month=1)
+        else:
+            first_day_next_month = first_day_current_month.replace(month=today.month + 1)
+        
+        current_month_transactions = Transaction.query.filter(
+            Transaction.user_id == user_id,
+            Transaction.date >= first_day_current_month,
+            Transaction.date < first_day_next_month
+        ).all()
+        
+        return jsonify({
+            'categories': [{'id': c.category_id, 'name': c.name, 'type': c.type} for c in categories],
+            'user_limits': [{'category_id': ul.category_id, 'limit': float(ul.monthly_limit)} for ul in user_limits],
+            'all_transactions': [{'id': t.transaction_id, 'category': t.category, 'price': t.price, 'date': str(t.date)} for t in transactions],
+            'current_month_transactions': [{'id': t.transaction_id, 'category': t.category, 'price': t.price, 'date': str(t.date)} for t in current_month_transactions],
+            'date_info': {
+                'today': str(today),
+                'first_day_current_month': str(first_day_current_month),
+                'first_day_next_month': str(first_day_next_month)
+            }
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        app.logger.error(f"Debug endpoint error: {str(e)}")
+        app.logger.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({"error": f"Debug failed: {str(e)}"}), 500
+
+# Removed complex icon and color functions - not needed
+
 @app.route('/api/dashboard-data', methods=['GET'])
 @require_login
 def dashboard_data():
@@ -1032,8 +1257,16 @@ def predict_next_month():
         user_id = session['user_id']
         # Fetch all transactions for the user
         transactions = Transaction.query.filter_by(user_id=user_id).all()
+        
+        # If no transactions, return empty arrays with success status
         if not transactions:
-            return jsonify({"error": "No transactions found for user."}), 404
+            return jsonify({
+                'expense': [0.0] * 30,
+                'income': [0.0] * 30,
+                'dates': [],
+                'expense_accuracy': None,
+                'income_accuracy': None
+            })
 
         # Build DataFrame
         data = [{
@@ -1142,6 +1375,90 @@ def change_password():
     user.password_hash = generate_password_hash(new_password)
     db.session.commit()
     return jsonify({'message': 'Password updated successfully'})
+
+@app.route('/api/forgot-password', methods=['POST'])
+def forgot_password():
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        
+        if not email:
+            return jsonify({"error": "Email is required"}), 400
+            
+        # Check if user exists
+        user = User.query.filter_by(email=email).first()
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        # Generate OTP and hash
+        otp = str(random.SystemRandom().randint(100000, 999999))
+        expires = int(time.time()) + OTP_EXPIRY
+        data_str = f"{email}.{otp}.{expires}"
+        otp_hash = hashlib.sha256(f"{data_str}{SECRET_KEY}".encode()).hexdigest()
+        
+        # Send OTP via email
+        try:
+            send_otp_email(email, otp)
+        except Exception as e:
+            return jsonify({"error": "Failed to send OTP email"}), 503
+
+        return jsonify({
+            "message": "OTP sent to email",
+            "otpHash": f"{otp_hash}.{expires}",
+            "email": email
+        }), 200
+
+    except Exception as e:
+        app.logger.error(f"Forgot password error: {str(e)}")
+        return jsonify({"error": "Internal server error"}), 500
+
+@app.route('/api/reset-password', methods=['POST'])
+def reset_password():
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        user_otp = data.get('otp')
+        received_hash = data.get('otpHash')
+        new_password = data.get('new_password')
+
+        if not all([email, user_otp, received_hash, new_password]):
+            return jsonify({"error": "All fields are required"}), 400
+
+        # Validate hash structure
+        if '.' not in received_hash:
+            return jsonify({"error": "Invalid OTP format"}), 400
+            
+        hash_part, expires = received_hash.split('.', 1)
+        
+        # Check expiration
+        if int(expires) < time.time():
+            return jsonify({"error": "OTP expired"}), 401
+
+        # Recreate verification hash
+        data_str = f"{email}.{user_otp}.{expires}"
+        expected_hash = hashlib.sha256(f"{data_str}{SECRET_KEY}".encode()).hexdigest()
+
+        # Validate OTP hash
+        if expected_hash != hash_part:
+            return jsonify({"error": "Invalid OTP"}), 401
+
+        # Find user and update password
+        user = User.query.filter_by(email=email).first()
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        # Update password
+        user.password_hash = generate_password_hash(new_password)
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "message": "Password reset successfully"
+        }), 200
+
+    except Exception as e:
+        app.logger.error(f"Password reset error: {str(e)}")
+        return jsonify({"error": "Internal server error"}), 500
 
 @app.route('/api/calendar-daily-summary', methods=['GET'])
 @require_login

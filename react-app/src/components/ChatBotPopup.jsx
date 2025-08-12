@@ -127,11 +127,29 @@ const ChatBotPopup = () => {
   };
 
   const rejectTransaction = () => {
-    setMessages(prev => [...prev, { 
-      text: "Transaction cancelled. Please try again with different details.",
-      isBot: true 
-    }]);
+    // Clear the pending transaction
     setPendingTransaction(null);
+    
+    // Update the last message to remove structuredData (review card)
+    setMessages(prev => {
+      const newMessages = [...prev];
+      if (newMessages.length > 0) {
+        const lastMessage = newMessages[newMessages.length - 1];
+        if (lastMessage.structuredData) {
+          // Remove structuredData to hide the review card
+          const { structuredData, ...messageWithoutData } = lastMessage;
+          newMessages[newMessages.length - 1] = messageWithoutData;
+        }
+      }
+      
+      // Add cancellation message
+      newMessages.push({ 
+        text: "Transaction cancelled. Please try again with different details.",
+        isBot: true 
+      });
+      
+      return newMessages;
+    });
   };
 
   const handleVoiceInput = () => {

@@ -240,17 +240,7 @@ const SignInLayer = () => {
               />
             </div>
 
-            <div className="d-flex justify-content-between gap-2">
-              <div className="form-check style-check d-flex align-items-center">
-                <input
-                  className="form-check-input border border-neutral-300"
-                  type="checkbox"
-                  id="remember"
-                />
-                <label className="form-check-label" htmlFor="remember">
-                  Remember me
-                </label>
-              </div>
+            <div className="d-flex justify-content-end">
               <Link to="/forgot-password" className="text-primary-600 fw-medium">
                 Forgot Password?
               </Link>

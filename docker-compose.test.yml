@@ -1,0 +1,99 @@
+version: '3.8'
+
+services:
+  # Test database
+  test-db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: testpassword
+      MYSQL_DATABASE: spendy_test
+      MYSQL_USER: testuser
+      MYSQL_PASSWORD: testpassword
+    ports:
+      - "3308:3306"
+    volumes:
+      - test_db_data:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password
+
+  # Test API service
+  test-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      MYSQL_HOST: test-db
+      MYSQL_USER: testuser
+      MYSQL_PASSWORD: testpassword
+      MYSQL_DATABASE: spendy_test
+      MYSQL_PORT: 3306
+      SECRET_KEY: test-secret-key
+      MAIL_SERVER: localhost
+      MAIL_PORT: 587
+      MAIL_USE_TLS: false
+      MAIL_USERNAME: test@example.com
+      MAIL_PASSWORD: testpassword
+      ANTHROPIC_API_KEY: test-key
+      FLASK_ENV: testing
+    ports:
+      - "5001:5000"
+    depends_on:
+      - test-db
+    volumes:
+      - .:/app
+    command: >
+      sh -c "
+        echo 'Waiting for database...' &&
+        while ! nc -z test-db 3306; do sleep 1; done &&
+        echo 'Database is ready!' &&
+        python -m pytest tests/ -v --tb=short
+      "
+
+  # Test frontend service
+  test-frontend:
+    build:
+      context: ./react-app
+      dockerfile: Dockerfile
+    environment:
+      - CI=true
+      - REACT_APP_API_URL=http://test-api:5000
+    ports:
+      - "3001:3000"
+    depends_on:
+      - test-api
+    volumes:
+      - ./react-app:/app
+      - /app/node_modules
+    command: >
+      sh -c "
+        npm install &&
+        npm test -- --watchAll=false --coverage --passWithNoTests
+      "
+
+  # Integration test service
+  integration-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      MYSQL_HOST: test-db
+      MYSQL_USER: testuser
+      MYSQL_PASSWORD: testpassword
+      MYSQL_DATABASE: spendy_test
+      MYSQL_PORT: 3306
+      SECRET_KEY: test-secret-key
+      ANTHROPIC_API_KEY: test-key
+      FLASK_ENV: testing
+    depends_on:
+      - test-api
+      - test-frontend
+    volumes:
+      - .:/app
+    command: >
+      sh -c "
+        echo 'Waiting for services...' &&
+        sleep 10 &&
+        python run_tests.py --integration-only
+      "
+
+volumes:
+  test_db_data: 
