@@ -53,24 +53,22 @@ const LineDataLabel = () => {
             zoom: {
                 enabled: false,
             },
+            animations: {
+                enabled: true
+            },
             dropShadow: {
                 enabled: false,
-                top: 6,
-                left: 0,
-                blur: 4,
-                color: "#000",
-                opacity: 0.1,
             },
         },
+        stroke: {
+            curve: "smooth",
+            colors: ["#487FFF"],
+            width: 3,
+            lineCap: 'round'
+        },
         fill: {
-            type: "gradient",
-            gradient: {
-                shadeIntensity: 1,
-                inverseColors: false,
-                opacityFrom: 0,
-                opacityTo: 0,
-                stops: [0, 90, 100],
-            },
+            type: 'solid',
+            opacity: 1,
         },
         dataLabels: {
             enabled: true,
@@ -82,17 +80,14 @@ const LineDataLabel = () => {
                 colors: ["#304758"],
             },
         },
-        stroke: {
-            curve: "smooth",
-            colors: ["#487FFF"],
-            width: 3,
-        },
         markers: {
-            size: 0,
-            strokeWidth: 3,
+            size: 4,
+            strokeWidth: 2,
             hover: {
                 size: 8,
             },
+            colors: ["#487FFF"],
+            strokeColors: "#fff"
         },
         tooltip: {
             enabled: true,
